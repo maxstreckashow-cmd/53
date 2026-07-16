@@ -1,0 +1,6 @@
+{
+  "name": "Domoplaner to Tilda Feed Converter",
+  "description": "Professional tool to convert Domoplaner CRM JSON real estate feeds into Tilda Catalog compatible YML or CSV formats, enabling seamless manual uploads or fully automated daily catalog synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

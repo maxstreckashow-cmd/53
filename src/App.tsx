@@ -4,6 +4,7 @@ import {
   Settings, 
   Copy, 
   Check, 
+  Save, 
   ExternalLink, 
   FileCode, 
   FileSpreadsheet, 
@@ -64,11 +65,14 @@ export default function App() {
   const [categoryType, setCategoryType] = useState("property_type"); // "project", "project_house", "property_type", "combined"
   const [priceFormat, setPriceFormat] = useState("full"); // "full" | "million"
   const [includeLayout, setIncludeLayout] = useState("yes"); // "yes" | "no"
+  const [customDomain, setCustomDomain] = useState("https://catalog.residence-tula.ru");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<FeedStats | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // States for Integrations and Webhooks
   const [activeTab, setActiveTab] = useState<"preview" | "widget" | "webhook">("preview");
@@ -151,11 +155,62 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchStats(feedUrl);
+    const initSettings = async () => {
+      try {
+        const response = await fetch("/api/get-settings");
+        if (response.ok) {
+          const settings = await response.json();
+          if (settings.feedUrl) setFeedUrl(settings.feedUrl);
+          if (settings.statusFilter) setStatusFilter(settings.statusFilter);
+          if (settings.allowedTypes) setAllowedTypes(settings.allowedTypes);
+          if (settings.categoryType) setCategoryType(settings.categoryType);
+          if (settings.priceFormat) setPriceFormat(settings.priceFormat);
+          if (settings.includeLayout) setIncludeLayout(settings.includeLayout);
+          if (settings.customDomain) setCustomDomain(settings.customDomain);
+          
+          fetchStats(settings.feedUrl || feedUrl);
+        } else {
+          fetchStats(feedUrl);
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+        fetchStats(feedUrl);
+      }
+    };
+    initSettings();
   }, []);
 
   const handleRefreshStats = () => {
     fetchStats(feedUrl);
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    setSaveSuccess(false);
+    try {
+      const res = await fetch("/api/save-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedUrl,
+          statusFilter,
+          allowedTypes,
+          categoryType,
+          priceFormat,
+          includeLayout,
+          customDomain
+        })
+      });
+      if (res.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+        fetchStats(feedUrl);
+      }
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const toggleType = (type: number) => {
@@ -171,7 +226,8 @@ export default function App() {
   // Build the dynamic api converter links
   const appOrigin = window.location.origin;
   // Автоматически заменяем приватный -dev- домен на публичный -pre- (Shared App URL), чтобы все интеграции работали без авторизации в AI Studio
-  const publicOrigin = appOrigin.replace("-dev-", "-pre-");
+  const defaultPublicOrigin = appOrigin.replace("-dev-", "-pre-");
+  const publicOrigin = customDomain.trim() ? customDomain.trim().replace(/\/$/, "") : defaultPublicOrigin;
   const buildQueryString = (format: "yml" | "csv") => {
     const params = new URLSearchParams();
     params.set("feedUrl", feedUrl);
@@ -184,10 +240,17 @@ export default function App() {
     return params.toString();
   };
 
-  const ymlLink = `${publicOrigin}/api/feed-convert?${buildQueryString("yml")}`;
-  const ymlDownloadLink = `${ymlLink}&download=true`;
-  const csvLink = `${publicOrigin}/api/feed-convert?${buildQueryString("csv")}`;
-  const jsonLink = `${publicOrigin}/api/feed-json?${buildQueryString("yml")}`;
+  // New clean URLs ending with correct file extensions for direct Tilda compatibility!
+  const cleanYmlLink = `${publicOrigin}/feed.yml`;
+  const cleanYmlDownloadLink = `${cleanYmlLink}?download=true`;
+  const cleanXmlLink = `${publicOrigin}/feed.xml`;
+  const cleanCsvLink = `${publicOrigin}/feed.csv`;
+  const cleanCsvDownloadLink = `${cleanCsvLink}?download=true`;
+
+  const ymlLink = cleanYmlLink;
+  const ymlDownloadLink = cleanYmlDownloadLink;
+  const csvLink = cleanCsvLink;
+  const jsonLink = `${publicOrigin}/api/feed-json`;
 
   const handleCopy = (link: string, type: string) => {
     navigator.clipboard.writeText(link);
@@ -253,6 +316,68 @@ export default function App() {
 
   const tildaSlidersCode = `<!-- Стиль и скрипт для превращения фильтров «Площадь» и «Этаж» в Tilda в красивые слайдеры -->
 <style>
+/* Скрытие кнопок "Показать все" в фильтрах Tilda */
+.t-store__filter__showmore,
+.t-store__filter__show-more,
+.t-store__filter__btn-more,
+.t-store__filter__more-btn,
+.t-store__filter__more,
+.t-store__filter__btn-showmore,
+.t-store__filter__btn_showmore,
+.t-store__filter__btn-more-wrapper,
+.t-store__filter__item-more,
+.t-store__filter__item_more,
+.js-store-filter-showmore,
+.js-store-filter-btn-more,
+.t-store__filter__btn-all,
+.t-store__filter__show-all,
+.js-store-filter-item-more,
+.t-store__filter__more-wrap {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Скрытие нижнего всплывающего поп-апа с выбранными вариантами (t-store__filter__chosen-bar) */
+.t-store__filter__chosen-bar,
+.js-store-filter-chosen-bar,
+.t-store__filter__chosen-bar_show,
+.t-store__filter__chosen-bar_active,
+[class*="t-store__filter__chosen-bar"],
+[class*="chosen-bar"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(200%) !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Скрытие всплывающего поп-апа с ошибкой формы Tilda "Пожалуйста, заполните все обязательные поля" */
+.t-form__errorbox-text,
+.t-form__errorbox-wrapper,
+.t-form__errorbox-item,
+.t-form__errorbox-middle,
+.t-form__errorbox-bottom,
+.js-errorbox-all,
+.js-error-box-all,
+[class*="t-form__errorbox"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
+
 .custom-range-slider-container {
   width: 100%;
   margin-top: 10px;
@@ -367,7 +492,49 @@ export default function App() {
 
 <script>
 (function() {
+  function hideTildaFilterElements() {
+    var chosenBars = document.querySelectorAll('.t-store__filter__chosen-bar, .js-store-filter-chosen-bar, [class*="t-store__filter__chosen-bar"], [class*="chosen-bar"]');
+    chosenBars.forEach(function(bar) {
+      bar.style.setProperty('display', 'none', 'important');
+      bar.style.setProperty('visibility', 'hidden', 'important');
+      bar.style.setProperty('opacity', '0', 'important');
+      bar.style.setProperty('transform', 'translateY(200%)', 'important');
+      bar.style.setProperty('pointer-events', 'none', 'important');
+    });
+
+    var showMoreBtns = document.querySelectorAll('.t-store__filter__showmore, .t-store__filter__show-more, .t-store__filter__btn-more, .t-store__filter__more-btn, .t-store__filter__more, .t-store__filter__btn-showmore, .t-store__filter__btn_showmore, .t-store__filter__btn-more-wrapper, .t-store__filter__item-more, .t-store__filter__item_more, .js-store-filter-showmore, .js-store-filter-btn-more, .t-store__filter__btn-all, .t-store__filter__show-all, .js-store-filter-item-more, .t-store__filter__more-wrap');
+    showMoreBtns.forEach(function(btn) {
+      btn.style.setProperty('display', 'none', 'important');
+    });
+
+    var filterEls = document.querySelectorAll('.t-store__filter *, .js-store-filter *');
+    filterEls.forEach(function(el) {
+      if (el.children.length === 0 && el.textContent) {
+        var txt = el.textContent.trim().toLowerCase();
+        if (txt === 'показать все' || txt === 'показать всё' || txt === 'показать еще' || txt === 'показать ещё') {
+          var target = el;
+          if (el.tagName !== 'BUTTON' && el.tagName !== 'A' && el.parentElement) {
+            target = el.closest('button, a, .t-store__filter__btn-more, div') || el;
+          }
+          target.style.setProperty('display', 'none', 'important');
+        }
+      }
+    });
+
+    var errorBoxes = document.querySelectorAll('.t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
+    errorBoxes.forEach(function(box) {
+      box.style.setProperty('display', 'none', 'important');
+      box.style.setProperty('visibility', 'hidden', 'important');
+      box.style.setProperty('opacity', '0', 'important');
+      box.style.setProperty('height', '0', 'important');
+      box.style.setProperty('padding', '0', 'important');
+      box.style.setProperty('margin', '0', 'important');
+      box.style.setProperty('pointer-events', 'none', 'important');
+    });
+  }
+
   function initTildaCustomSliders() {
+    hideTildaFilterElements();
     var filterItems = document.querySelectorAll('.js-store-filter-item, .t-store__filter__item, .t-store__filter-item, .t-store__filter__wrap');
     if (!filterItems.length) return;
 
@@ -678,147 +845,209 @@ export default function App() {
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTildaCustomSliders);
+    document.addEventListener('DOMContentLoaded', function() {
+      hideTildaFilterElements();
+      initTildaCustomSliders();
+    });
   } else {
+    hideTildaFilterElements();
     initTildaCustomSliders();
   }
   
   var observer = new MutationObserver(function() {
+    hideTildaFilterElements();
     initTildaCustomSliders();
   });
   observer.observe(document.body, { childList: true, subtree: true });
+  setInterval(hideTildaFilterElements, 500);
 })();
 </script>`;
 
   const tildaLiveSyncCode = `<!-- Скрипт «Живой авто-синхронизатор» цен и бронирования на Tilda -->
+<style>
+.t-store__filter__showmore, .t-store__filter__show-more, .t-store__filter__btn-more,
+.t-store__filter__more-btn, .t-store__filter__more, .t-store__filter__btn-showmore,
+.t-store__filter__btn_showmore, .t-store__filter__btn-more-wrapper, .t-store__filter__item-more,
+.t-store__filter__item_more, .js-store-filter-showmore, .js-store-filter-btn-more,
+.t-store__filter__btn-all, .t-store__filter__show-all, .t-store__filter__chosen-bar,
+.js-store-filter-chosen-bar, .t-store__filter__chosen-bar_show, .t-store__filter__chosen-bar_active,
+[class*="t-store__filter__chosen-bar"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.custom-sync-status-badge, .t-store__card__mark, .js-store-prod-mark {
+  border-radius: 0 !important;
+  font-family: 'Montserrat', Montserrat, Arial, sans-serif !important;
+  border: none !important;
+}
+</style>
 <script>
 (function() {
-  // Базовый адрес API моста
   const BASE_API_URL = "${jsonLink}";
+  window._domoFeedCache = window._domoFeedCache || null;
 
-  async function syncTildaCatalog() {
+  function hideTildaFilterElements() {
     try {
-      console.log("[FeedBridge] Начинаем real-time синхронизацию каталога Tilda...");
-      
-      // Добавляем кэш-бастер к запросу, чтобы браузеры посетителей не кэшировали JSON
-      const separator = BASE_API_URL.indexOf('?') !== -1 ? '&' : '?';
-      const fetchUrl = BASE_API_URL + separator + "_t=" + Date.now();
-      
-      // Используем credentials только для доменов разработчика (-dev-), для публичных (-pre-) делаем стандартный чистый запрос
-      const fetchOpts = fetchUrl.indexOf('-dev-') !== -1 ? { credentials: 'include' } : {};
-      const response = await fetch(fetchUrl, fetchOpts);
-      if (!response.ok) throw new Error("Ошибка загрузки данных с моста");
-      const flats = await response.json();
-      
-      // Создаем карту для сверхбыстрого сопоставления
-      const flatMap = {};
-      flats.forEach(f => {
-        const flatId = String(f.id);
-        // Индексируем по чистому ID
-        flatMap[flatId] = f;
-        
-        // Индексируем по SKU (например DOMO-123)
-        if (f.sku) {
-          flatMap[String(f.sku)] = f;
-          flatMap[String(f.sku).replace("DOMO-", "")] = f;
-        }
-        
-        // Индексируем по Tilda UID (300000000000 + ID)
-        const tildaUid = String(300000000000 + Number(f.id));
-        flatMap[tildaUid] = f;
+      const chosenBars = document.querySelectorAll('.t-store__filter__chosen-bar, .js-store-filter-chosen-bar, [class*="t-store__filter__chosen-bar"]');
+      chosenBars.forEach(bar => {
+        bar.style.setProperty('display', 'none', 'important');
+        bar.style.setProperty('visibility', 'hidden', 'important');
+        bar.style.setProperty('opacity', '0', 'important');
       });
+      const showMoreBtns = document.querySelectorAll('.t-store__filter__showmore, .t-store__filter__show-more, .t-store__filter__btn-more, .t-store__filter__more-btn, .t-store__filter__more, .t-store__filter__btn-showmore, .t-store__filter__btn_showmore, .t-store__filter__btn-more-wrapper, .t-store__filter__item-more, .t-store__filter__item_more, .js-store-filter-showmore, .js-store-filter-btn-more, .t-store__filter__btn-all, .t-store__filter__show-all');
+      showMoreBtns.forEach(btn => {
+        btn.style.setProperty('display', 'none', 'important');
+      });
+      const errorBoxes = document.querySelectorAll('.t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
+      errorBoxes.forEach(box => {
+        box.style.setProperty('display', 'none', 'important');
+      });
+    } catch(e) {}
+  }
 
-      // Ищем карточки товаров Tilda на странице
-      const productElements = document.querySelectorAll('.js-product, .js-store-prod, .t-store__card, .t-prod-card, [data-product-lid]');
-      
-      let updatedCount = 0;
-      productElements.forEach(el => {
-        const lid = el.getAttribute('data-product-lid') || el.getAttribute('data-product-id') || el.getAttribute('data-product-uid') || '';
-        let sku = el.getAttribute('data-product-sku') || '';
+  // Мгновенное синхронное обновление элементов DOM из памяти (<1мс)
+  function applyDomoSyncToDOM() {
+    hideTildaFilterElements();
+    if (!window._domoFeedCache) return;
+
+    const flatMap = window._domoFeedCache.flatMap;
+    const flatByNumber = window._domoFeedCache.flatByNumber;
+
+    const selectors = [
+      '.js-product',
+      '.js-store-prod',
+      '.t-store__card',
+      '.t-prod-card',
+      '.js-store-product',
+      '.t-store__card__wrapper',
+      '.t-store__prod-popup',
+      '.js-store-prod-popup',
+      '.t-popup_show .js-product',
+      '.t-popup_show .t-store__prod-popup',
+      '[data-product-lid]',
+      '[data-product-id]',
+      '[data-product-sku]',
+      '[data-product-gen-uid]'
+    ];
+
+    const productElements = document.querySelectorAll(selectors.join(', '));
+    productElements.forEach(el => {
+      try {
+        let lid = el.getAttribute('data-product-lid') || 
+                  el.getAttribute('data-product-id') || 
+                  el.getAttribute('data-product-uid') || 
+                  el.getAttribute('data-product-gen-uid') || 
+                  el.getAttribute('data-product-external-id') || 
+                  el.getAttribute('data-card-uid') || '';
+
+        let sku = el.getAttribute('data-product-sku') || 
+                  el.getAttribute('data-product-external-id') || 
+                  el.getAttribute('data-sku') || 
+                  el.getAttribute('data-product-code') || '';
         
         if (!sku) {
-          const skuEl = el.querySelector('.js-store-prod-sku, .t-store__prod-popup__sku');
-          if (skuEl) sku = skuEl.textContent.replace(/Артикул:\\s*/i, '').trim();
+          const skuEl = el.querySelector('.js-store-prod-sku, .t-store__prod-popup__sku, .t-store__card__sku, .js-product-sku, [data-product-sku], input[name="sku"]');
+          if (skuEl) {
+            sku = skuEl.getAttribute('data-product-sku') || skuEl.value || skuEl.textContent.replace(/Артикул:\s*/i, '').replace(/SKU:\s*/i, '').trim();
+          }
+        }
+
+        if (!lid) {
+          const lidEl = el.querySelector('[data-product-lid], [data-product-id]');
+          if (lidEl) {
+            lid = lidEl.getAttribute('data-product-lid') || lidEl.getAttribute('data-product-id') || '';
+          }
         }
         
-        // Сопоставляем товар из Tilda с квартирой из Domoplaner
         let flat = null;
         if (lid && flatMap[lid]) {
           flat = flatMap[lid];
         } else if (sku && flatMap[sku]) {
           flat = flatMap[sku];
-        } else if (sku && flatMap[sku.replace("DOMO-", "")]) {
-          flat = flatMap[sku.replace("DOMO-", "")];
+        } else if (sku && flatMap[sku.toLowerCase()]) {
+          flat = flatMap[sku.toLowerCase()];
+        } else if (sku && flatMap[sku.replace(/^DOMO-/i, "")]) {
+          flat = flatMap[sku.replace(/^DOMO-/i, "")];
         } else if (lid) {
-          // Попробуем вычислить ID из Tilda UID (вычитаем 300000000000)
           const parsedId = parseInt(lid, 10);
           if (!isNaN(parsedId) && parsedId > 300000000000) {
             const calculatedId = String(parsedId - 300000000000);
-            if (flatMap[calculatedId]) {
-              flat = flatMap[calculatedId];
+            if (flatMap[calculatedId]) flat = flatMap[calculatedId];
+          }
+        }
+
+        if (!flat) {
+          const txt = el.textContent || '';
+          const domoMatch = txt.match(/DOMO-(\d+)/i);
+          if (domoMatch && flatMap[domoMatch[1]]) {
+            flat = flatMap[domoMatch[1]];
+          } else {
+            const flatNumMatch = txt.match(/№\s*(\d+[А-Яа-яA-Za-z]?)/i);
+            if (flatNumMatch && flatByNumber[flatNumMatch[1]]) {
+              flat = flatByNumber[flatNumMatch[1]];
             }
           }
         }
 
         if (!flat) return;
 
-        // 1. Синхронизируем цену (визуально и в атрибутах корзины Tilda!)
-        if (flat.price) {
-          const formattedPrice = Number(flat.price).toLocaleString('ru-RU') + ' ₽';
+        // 1. Обновляем цену
+        if (flat.price && Number(flat.price) > 0) {
+          const rawPrice = Number(flat.price);
+          const formattedPrice = rawPrice.toLocaleString('ru-RU') + ' ₽';
           
-          // Обновляем атрибуты на контейнере товара, чтобы корзина Tilda видела новую цену при клике "Купить"
-          el.setAttribute('data-product-price', String(flat.price));
+          el.setAttribute('data-product-price', String(rawPrice));
           el.querySelectorAll('[data-product-price]').forEach(child => {
-            child.setAttribute('data-product-price', String(flat.price));
+            child.setAttribute('data-product-price', String(rawPrice));
           });
           el.querySelectorAll('[data-product-price-def]').forEach(child => {
-            child.setAttribute('data-product-price-def', Number(flat.price).toFixed(4));
+            child.setAttribute('data-product-price-def', rawPrice.toFixed(4));
           });
           el.querySelectorAll('[data-product-price-def-str]').forEach(child => {
-            child.setAttribute('data-product-price-def-str', String(flat.price) + ',00');
+            child.setAttribute('data-product-price-def-str', String(rawPrice) + ',00');
           });
 
-          // Обновляем текстовые элементы с ценами на странице
-          const priceElements = el.querySelectorAll('.js-store-prod-price, .js-product-price, .t-store__card__price, .t-store__prod-popup__price-new, .t-store__card__price-value, .t-store__card__price_val');
+          const priceElements = el.querySelectorAll('.js-store-prod-price, .js-product-price, .t-store__card__price, .t-store__prod-popup__price-new, .t-store__card__price-value, .t-store__card__price_val, .js-store-prod-price-val, .t-store__prod-popup__price-value, .t-store__prod-popup__price');
           priceElements.forEach(pe => {
             const isValueOnly = pe.classList.contains('js-store-prod-price-val') || 
                                 pe.classList.contains('t-store__card__price-value') || 
                                 pe.classList.contains('t-store__card__price_val') ||
                                 pe.classList.contains('t-store__prod-popup__price-value');
             
-            const valEl = isValueOnly ? pe : pe.querySelector('.t-store__card__price-value, .js-store-prod-price-val, .t-store__card__price_val');
+            const valEl = isValueOnly ? pe : pe.querySelector('.t-store__card__price-value, .js-store-prod-price-val, .t-store__card__price_val, .t-store__prod-popup__price-value');
             if (valEl) {
-              valEl.textContent = Number(flat.price).toLocaleString('ru-RU');
+              valEl.textContent = rawPrice.toLocaleString('ru-RU');
               if (valEl.hasAttribute('data-product-price-def')) {
-                valEl.setAttribute('data-product-price-def', Number(flat.price).toFixed(4));
+                valEl.setAttribute('data-product-price-def', rawPrice.toFixed(4));
               }
               if (valEl.hasAttribute('data-product-price-def-str')) {
-                valEl.setAttribute('data-product-price-def-str', String(flat.price) + ',00');
+                valEl.setAttribute('data-product-price-def-str', String(rawPrice) + ',00');
               }
             } else {
               pe.textContent = formattedPrice;
             }
           });
 
-          // Обновляем в-памяти глобальный объект товара Tilda (если он есть)
-          if (typeof window.product !== 'undefined' && window.product && String(window.product.sku) === String(flat.id)) {
-            window.product.price = String(flat.price) + '.0000';
-          } else if (typeof product !== 'undefined' && product && String(product.sku) === String(flat.id)) {
-            product.price = String(flat.price) + '.0000';
+          if (typeof window.product !== 'undefined' && window.product && (String(window.product.sku) === String(flat.id) || String(window.product.lid) === String(lid))) {
+            window.product.price = String(rawPrice) + '.0000';
+          } else if (typeof product !== 'undefined' && product && (String(product.sku) === String(flat.id) || String(product.lid) === String(lid))) {
+            product.price = String(rawPrice) + '.0000';
           }
         }
 
-        // 2. Синхронизируем статус бронирования (свободно / забронировано)
+        // 2. Обновляем статус бронирования
         const isAvailable = flat.status === 0;
-        const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn');
+        const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn');
         
         let badge = el.querySelector('.custom-sync-status-badge');
         if (!badge) {
           badge = document.createElement('div');
           badge.className = 'custom-sync-status-badge';
-          badge.style.cssText = 'position:absolute;top:10px;right:10px;z-index:10;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:bold;text-transform:uppercase;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+          badge.style.cssText = 'position:absolute;top:10px;right:10px;z-index:10;padding:4px 8px;border-radius:0 !important;font-family:\'Montserrat\',Montserrat,Arial,sans-serif !important;font-size:10px;font-weight:bold;text-transform:uppercase;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:none !important;';
           
-          const imgWrapper = el.querySelector('.t-store__card__imgwrapper, .js-product-img, .t-bgimg');
+          const imgWrapper = el.querySelector('.t-store__card__imgwrapper, .js-product-img, .t-bgimg, .t-store__prod-popup__slider, .t-slds__container');
           if (imgWrapper) {
             imgWrapper.style.position = 'relative';
             imgWrapper.appendChild(badge);
@@ -832,11 +1061,12 @@ export default function App() {
           badge.textContent = 'Свободно';
           badge.style.backgroundColor = '#ecfdf5';
           badge.style.color = '#047857';
-          badge.style.border = '1px solid #10b981';
+          badge.style.border = 'none';
           
           btnElements.forEach(btn => {
             btn.style.display = '';
             btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
             if (btn.textContent.includes('Забронировано')) {
               btn.textContent = 'Выбрать';
               btn.style.backgroundColor = '';
@@ -848,7 +1078,7 @@ export default function App() {
           badge.textContent = 'Забронировано';
           badge.style.backgroundColor = '#fff7ed';
           badge.style.color = '#c2410c';
-          badge.style.border = '1px solid #f97316';
+          badge.style.border = 'none';
           
           btnElements.forEach(btn => {
             btn.textContent = 'Забронировано';
@@ -856,36 +1086,102 @@ export default function App() {
             btn.style.color = '#64748b';
             btn.style.borderColor = '#cbd5e1';
             btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.75';
           });
         }
-        
-        updatedCount++;
-      });
-      
-      console.log("[FeedBridge] Синхронизировано объектов на странице: " + updatedCount);
-    } catch (e) {
-      console.warn("[FeedBridge] Ошибка авто-синхронизации:", e);
-    }
-  }
-
-  // Запуск при загрузке страницы
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      syncTildaCatalog();
-      setTimeout(syncTildaCatalog, 1500);
+      } catch (err) {}
     });
-  } else {
-    syncTildaCatalog();
-    setTimeout(syncTildaCatalog, 1500);
   }
 
-  // Наблюдатель за изменениями DOM (например, при переключении страниц или открытии поп-апов)
-  let syncTimeout;
-  const observer = new MutationObserver(function() {
-    clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(syncTildaCatalog, 500);
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Асинхронное фоновое обновление данных с сервера
+  async function fetchFeedAndSync() {
+    try {
+      let baseUrl = BASE_API_URL;
+      if (baseUrl && !baseUrl.endsWith('/feed.json') && !baseUrl.endsWith('/api/feed-json') && baseUrl.indexOf('?') === -1) {
+        baseUrl = baseUrl.replace(/\/$/, '') + '/feed.json';
+      }
+      
+      const separator = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+      const fetchUrl = baseUrl + separator + "_t=" + Date.now();
+      
+      let flats = [];
+      try {
+        const fetchOpts = fetchUrl.indexOf('-dev-') !== -1 ? { credentials: 'include' } : {};
+        const response = await fetch(fetchUrl, fetchOpts);
+        if (response.ok) {
+          flats = await response.json();
+        } else {
+          const altResp = await fetch(fetchUrl);
+          if (altResp.ok) flats = await altResp.json();
+        }
+      } catch (err) {
+        try {
+          const altResp = await fetch(fetchUrl);
+          if (altResp.ok) flats = await altResp.json();
+        } catch(e) {}
+      }
+      
+      if (Array.isArray(flats) && flats.length > 0) {
+        const flatMap = {};
+        const flatByNumber = {};
+        
+        flats.forEach(f => {
+          if (!f || f.id === undefined) return;
+          const flatId = String(f.id);
+          flatMap[flatId] = f;
+          flatMap["DOMO-" + flatId] = f;
+          flatMap["domo-" + flatId] = f;
+          
+          if (f.sku) {
+            const skuStr = String(f.sku);
+            flatMap[skuStr] = f;
+            flatMap[skuStr.toLowerCase()] = f;
+            flatMap[skuStr.toUpperCase()] = f;
+            flatMap[skuStr.replace(/^DOMO-/i, "")] = f;
+          }
+          
+          const tildaUid = String(300000000000 + Number(f.id));
+          flatMap[tildaUid] = f;
+
+          if (f.number) {
+            flatByNumber[String(f.number).trim()] = f;
+          }
+        });
+
+        window._domoFeedCache = { flatMap, flatByNumber };
+        applyDomoSyncToDOM();
+      }
+    } catch (e) {}
+  }
+
+  // Первичный фоновый запрос
+  fetchFeedAndSync();
+
+  // Быстрый обработчик изменений DOM без сетевых вызовов
+  let rafId;
+  function scheduleDOMSync() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(function() {
+      applyDomoSyncToDOM();
+    });
+  }
+
+  const observer = new MutationObserver(scheduleDOMSync);
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+
+  // Реактивные триггеры на клики и наведение
+  document.addEventListener('click', scheduleDOMSync, true);
+  document.addEventListener('mouseover', scheduleDOMSync, true);
+
+  // Периодическое фоновое обновление данных каждые 10 секунд
+  setInterval(fetchFeedAndSync, 10000);
+  setInterval(applyDomoSyncToDOM, 1000);
 })();
 </script>`;
 
@@ -1040,14 +1336,37 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mt-auto pt-4 border-t border-slate-100">
+          <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
+            <button 
+              onClick={handleSaveSettings}
+              disabled={savingSettings || loading}
+              className={`w-full py-3 ${saveSuccess ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-lg font-bold text-xs tracking-wider uppercase shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50`}
+            >
+              {savingSettings ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Сохранение...
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  Сохранено в базу!
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  Сохранить настройки моста
+                </>
+              )}
+            </button>
+
             <button 
               onClick={handleRefreshStats}
               disabled={loading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs tracking-wider uppercase shadow-xs shadow-blue-100 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Синхронизация...' : 'Обновить фид'}
+              {loading ? 'Синхронизация...' : 'Обновить статистику'}
             </button>
           </div>
         </aside>
@@ -1057,16 +1376,21 @@ export default function App() {
           
           {/* Step 1: Input URL bar */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs mb-6" id="url_container">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block mb-2 font-display">
-              Источник импорта (Ввод URL)
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block font-display">
+                Источник импорта (Ввод URL-адреса фида или API-ключа)
+              </label>
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded-full font-semibold">
+                Поддерживает API-ключи
+              </span>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input 
                 type="text" 
                 value={feedUrl} 
                 onChange={(e) => setFeedUrl(e.target.value)}
                 className="flex-1 bg-slate-50 border border-slate-200 focus:border-blue-400 focus:bg-white rounded-lg px-3.5 py-2.5 text-xs font-mono text-slate-700 focus:outline-none transition-all"
-                placeholder="https://domoplaner.ru/dc-api/feeds/..."
+                placeholder="Вставьте ссылку на фид или API-ключ (например: 311_H07j2kuqia...)"
                 id="url_field"
               />
               <button 
@@ -1078,6 +1402,9 @@ export default function App() {
                 {loading ? 'Анализ...' : 'Проверить'}
               </button>
             </div>
+            <p className="mt-2 text-[11px] text-slate-500 leading-normal">
+              💡 <strong>Совет:</strong> Вы можете вставить как полную ссылку на JSON-фид, так и скопированный из кабинета Domoplaner <strong>API-ключ</strong> (в формате <code>311_H07j2kuqiaME...</code>). Мост автоматически преобразует его в нужный адрес!
+            </p>
 
             <AnimatePresence mode="wait">
               {loading && (
@@ -1131,23 +1458,23 @@ export default function App() {
             </AnimatePresence>
           </div>
 
-          {/* Важное предупреждение о песочнице AI Studio */}
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-900 shadow-3xs" id="sandbox_warning_block">
+          {/* Важное предупреждение о песочнице AI Studio и Решение для Тильды */}
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-5 text-slate-900 shadow-3xs" id="sandbox_warning_block">
             <div className="flex gap-3">
-              <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-sm text-amber-950 mb-1.5 font-display">⚠️ Почему ссылки авто-обновления не работают напрямую в Tilda во время тестирования?</h4>
-                <p className="text-xs text-amber-800 leading-relaxed mb-3">
-                  Все приложения, запущенные внутри среды разработки <strong>AI Studio</strong>, защищены встроенным файрволом Google. При попытке серверов Tilda (или скриптов в стороннем браузере) обратиться к вашей ссылке YML/JSON напрямую, Google перенаправляет их на страницу проверки безопасности и авторизации. Сервер Tilda не может пройти эту проверку, поэтому выдает ошибку загрузки.
+                <h4 className="font-bold text-sm text-blue-950 mb-1.5 font-display">🚀 Поддержка прямой синхронизации и импорта в Тильду исправлена!</h4>
+                <p className="text-xs text-slate-700 leading-relaxed mb-3">
+                  Поскольку Тильда требует, чтобы ссылка авто-обновления вела напрямую на файл с расширением <strong>.yml</strong> или <strong>.xml</strong> (и не принимает сложные ссылки с параметрами), мы добавили прямые файловые адреса. Теперь вы можете использовать чистую ссылку, которая выглядит как физический файл!
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 text-xs">
-                  <div className="bg-white/60 p-3.5 rounded-lg border border-amber-150">
-                    <span className="font-bold block text-amber-950 mb-1">📦 Решение для тестирования (Работает на 100%):</span>
-                    Скачайте готовый файл, нажав кнопку <strong>«Скачать YML»</strong> или <strong>«Скачать свежий CSV»</strong> ниже, и загрузите его вручную в каталог Tilda в личном кабинете. Этот метод работает мгновенно, так как Tilda загружает готовый физический файл!
+                  <div className="bg-white/80 p-3.5 rounded-lg border border-blue-100">
+                    <span className="font-bold block text-blue-950 mb-1">📦 Вариант 1: Загрузка готового файла (Ручной импорт)</span>
+                    Нажмите кнопку <strong>«Скачать YML»</strong> или <strong>«Скачать свежий CSV»</strong> ниже. Вы получите файл <code>domoplaner_tilda_catalog.yml</code> (или <code>.csv</code>) на компьютер. В личном кабинете Tilda зайдите в <strong>Товары → Импорт товаров</strong> и перетащите скачанный файл.
                   </div>
-                  <div className="bg-white/60 p-3.5 rounded-lg border border-amber-150">
-                    <span className="font-bold block text-amber-950 mb-1">🚀 Решение для автоматического обновления:</span>
-                    Когда вы будете готовы запустить проект, экспортируйте этот мост в ZIP (через меню настроек приложения) или опубликуйте его на любом хостинге (Vercel, Render, Railway или своем сервере). На рабочем хостинге файрвола Google нет — Tilda сможет сама скачивать ваш YML по ссылке каждую ночь!
+                  <div className="bg-white/80 p-3.5 rounded-lg border border-blue-100">
+                    <span className="font-bold block text-blue-950 mb-1">🔄 Вариант 2: Авто-обновление по ссылке (Каждые 24 часа)</span>
+                    Скопируйте короткую ссылку типа <code>/feed.yml</code>. В панели Tilda зайдите в <strong>Товары → Настройки каталога → Синхронизация</strong>, выберите <strong>YML/XML</strong> и вставьте ссылку. Тильда сама будет обновлять цены и остатки по расписанию!
                   </div>
                 </div>
               </div>
@@ -1163,39 +1490,39 @@ export default function App() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
                     <FileCode className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-bold text-sm font-display text-slate-900">Вариант А: YML-ссылка (XML)</h3>
+                    <h3 className="font-bold text-sm font-display text-slate-900">Вариант А: YML-ссылка / YML-файл (XML)</h3>
                   </div>
                   <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Рекомендуется
+                    Прямой файл .yml
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Позволяет Tilda ежедневно автоматически обновлять ваш каталог: опрашивать цены, планировки и наличие квартир.
+                  Прямая ссылка для авто-обновления Тильды или файл для ручной загрузки. Принудительно отдает структуру Yandex Market YML.
                 </p>
 
                 <div className="bg-slate-50 border border-slate-150 p-2.5 rounded-lg text-[11px] font-mono text-slate-600 break-all select-all mb-4 overflow-y-auto max-h-16 scrollbar-none">
-                  {ymlLink}
+                  {cleanYmlLink}
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <button 
-                  onClick={() => handleCopy(ymlLink, "yml")}
+                  onClick={() => handleCopy(cleanYmlLink, "yml")}
                   className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs"
                 >
                   {copiedLink === "yml" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedLink === "yml" ? 'Скопировано!' : 'Копировать'}
+                  {copiedLink === "yml" ? 'Скопировано!' : 'Копировать ссылку'}
                 </button>
                 <a 
-                  href={ymlDownloadLink}
+                  href={cleanYmlDownloadLink}
                   download="domoplaner_tilda_catalog.yml"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs text-center"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Скачать YML
                 </a>
                 <a 
-                  href={ymlLink}
+                  href={cleanYmlLink}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg flex items-center justify-center transition-all shadow-3xs"
@@ -1215,7 +1542,7 @@ export default function App() {
                     <h3 className="font-bold text-sm font-display text-slate-900">Вариант Б: CSV Таблица</h3>
                   </div>
                   <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Ручной импорт
+                    Прямой файл .csv
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-3 leading-relaxed">
@@ -1223,42 +1550,32 @@ export default function App() {
                 </p>
 
                 <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mb-3 text-[11px] text-emerald-800 leading-relaxed">
-                  <span className="font-bold">⚡ Обход кэша при скачивании:</span> Так как Tilda поддерживает импорт каталога только в виде физического CSV-файла, при каждом клике на скачивание мы принудительно обходим кэш браузера и серверов. Вы гарантированно скачаете 100% свежие цены из Domoplaner!
+                  <span className="font-bold">⚡ Обход кэша:</span> При каждом скачивании или запросе мы принудительно обходим кэш серверов. Вы гарантированно получаете 100% свежие цены из Domoplaner!
                 </div>
 
                 <div className="bg-slate-50 border border-slate-150 p-2.5 rounded-lg text-[11px] font-mono text-slate-600 break-all select-all mb-4 overflow-y-auto max-h-16 scrollbar-none">
-                  {csvLink}
+                  {cleanCsvLink}
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => handleCopy(csvLink, "csv")}
+                    onClick={() => handleCopy(cleanCsvLink, "csv")}
                     className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs"
-                    title="Копировать стандартную ссылку"
+                    title="Копировать прямую ссылку"
                   >
                     {copiedLink === "csv" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                   <a 
-                    href={`${csvLink}&_t=${Date.now()}`}
-                    onClick={(e) => {
-                      e.currentTarget.href = `${csvLink}&_t=${Date.now()}`;
-                    }}
+                    href={cleanCsvDownloadLink}
                     download="domoplaner_tilda_catalog.csv"
                     className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-3xs cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5 animate-bounce" />
-                    Скачать свежий CSV (без кэша)
+                    <Download className="w-3.5 h-3.5" />
+                    Скачать свежий CSV
                   </a>
                 </div>
-                <button 
-                  onClick={() => handleCopyCacheBusted(csvLink, "csv_busted")}
-                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs"
-                >
-                  {copiedLink === "csv_busted" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedLink === "csv_busted" ? 'Ссылка скопирована!' : 'Копировать ссылку с обходом кэша'}
-                </button>
               </div>
             </div>
 
@@ -1343,7 +1660,7 @@ export default function App() {
                                 <div>
                                   <span className="text-xs font-semibold text-slate-900 block">{finalTitle}</span>
                                   <span className="text-[10px] text-slate-400 mt-0.5 block">
-                                    ЖК {f.projectTitle} • Корпус {f.houseTitle} • Эт. {f.floorNumber}
+                                    ЖК {f.projectTitle} • Корпус {f.houseTitle} • Эт. {f.floorNumber} • Кол-во комнат: {f.type === 0 ? (f.is_studio ? 'Студия' : f.rooms !== null && f.rooms !== undefined ? f.rooms : '1') : f.type === 1 ? 'Паркинг' : f.type === 3 ? 'Коммерция' : 'Другое'}
                                   </span>
                                 </div>
                               </div>
@@ -1376,6 +1693,41 @@ export default function App() {
                 <p className="text-xs text-slate-500 mb-6 leading-relaxed">
                   Не хотите использовать стандартный каталог Tilda? Вы можете вставить этот адаптивный JavaScript-виджет в любой HTML-блок (например, <strong>T123</strong>) на вашем сайте. Он будет в реальном времени подтягивать отфильтрованные квартиры прямо из вашего Domoplaner JSON-фида через наш мост-конвертер.
                 </p>
+
+                {/* Custom Domain Configuration Card */}
+                <div className="mb-6 bg-indigo-50/40 border border-indigo-100 p-4 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                    <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider">Адрес вашего развернутого моста (например, на Render)</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+                    Вы развернули этот проект на стороннем сервере (например, <strong>https://catalog.residence-tula.ru</strong>)? Введите его адрес ниже. Все сгенерированные коды T123 и ссылки на фиды автоматически перестроятся на ваш рабочий домен!
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customDomain}
+                      onChange={(e) => setCustomDomain(e.target.value)}
+                      placeholder="https://your-app.onrender.com"
+                      className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg text-xs font-mono text-slate-700 focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                    {customDomain !== "https://catalog.residence-tula.ru" && (
+                      <button
+                        onClick={() => setCustomDomain("https://catalog.residence-tula.ru")}
+                        className="px-3 bg-slate-150 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                      >
+                        Сбросить
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveSettings}
+                      disabled={savingSettings}
+                      className="px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-3xs cursor-pointer"
+                    >
+                      {savingSettings ? "Сохранение..." : saveSuccess ? "Сохранено!" : "Сохранить домен"}
+                    </button>
+                  </div>
+                </div>
 
                 {/* JSON Dynamic Link */}
                 <div className="mb-6 bg-slate-50 border border-slate-200 p-4 rounded-xl">
@@ -1469,7 +1821,10 @@ export default function App() {
           }
         </div>
         <div style="font-weight:700;font-size:15px;color:#0f172a;margin-bottom:4px;">\\\${f.title}</div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.4;">\\\${f.description}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:6px;line-height:1.4;">\\\${f.description}</div>
+        <div style="font-size:11px;color:#475569;margin-bottom:12px;font-weight:500;display:flex;align-items:center;gap:4px;">
+          <span style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">Кол-во комнат: \\\${f.roomsCount || '—'}</span>
+        </div>
         <div style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;">
           <div style="font-weight:800;font-size:16px;color:#2563eb;">\\\${f.price?f.price.toLocaleString('ru-RU')+' ₽':'По запросу'}</div>
           <button style="background:#2563eb;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;">Выбрать</button>

@@ -2,11 +2,82 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Path to settings file
+const SETTINGS_FILE = path.join(process.cwd(), "feed_settings.json");
+
+interface FeedSettings {
+  feedUrl: string;
+  statusFilter: string;
+  allowedTypes: number[];
+  categoryType: string;
+  priceFormat: string;
+  includeLayout: string;
+  customDomain?: string;
+}
+
+const defaultSettings: FeedSettings = {
+  feedUrl: "https://domoplaner.ru/dc-api/feeds/311-mTA43T5ivZbLiORunzQVnjsGdtjVuFDFQzFr466CDXX78Kz206M0ZaQjWLnO1soT/",
+  statusFilter: "free",
+  allowedTypes: [0, 1, 3],
+  categoryType: "property_type",
+  priceFormat: "full",
+  includeLayout: "yes",
+  customDomain: "https://catalog.residence-tula.ru"
+};
+
+function getSavedSettings(): FeedSettings {
+  let settings = { ...defaultSettings };
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = fs.readFileSync(SETTINGS_FILE, "utf-8");
+      settings = { ...settings, ...JSON.parse(data) };
+    }
+  } catch (e) {
+    console.error("Error reading settings file:", e);
+  }
+
+  // Override with environment variables if present (especially useful for cloud hosting like Render)
+  if (process.env.FEED_URL) {
+    settings.feedUrl = process.env.FEED_URL;
+  }
+  if (process.env.STATUS_FILTER) {
+    settings.statusFilter = process.env.STATUS_FILTER;
+  }
+  if (process.env.ALLOWED_TYPES) {
+    settings.allowedTypes = process.env.ALLOWED_TYPES.split(",").map(t => parseInt(t.trim(), 10)).filter(t => !isNaN(t));
+  }
+  if (process.env.CATEGORY_TYPE) {
+    settings.categoryType = process.env.CATEGORY_TYPE;
+  }
+  if (process.env.PRICE_FORMAT) {
+    settings.priceFormat = process.env.PRICE_FORMAT;
+  }
+  if (process.env.INCLUDE_LAYOUT) {
+    settings.includeLayout = process.env.INCLUDE_LAYOUT;
+  }
+  if (process.env.CUSTOM_DOMAIN) {
+    settings.customDomain = process.env.CUSTOM_DOMAIN;
+  }
+
+  return settings;
+}
+
+function saveSettings(settings: Partial<FeedSettings>) {
+  try {
+    const current = getSavedSettings();
+    const updated = { ...current, ...settings };
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error writing settings file:", e);
+  }
+}
 
 // Enable JSON request body parsing
 app.use(express.json());
@@ -24,6 +95,55 @@ app.use("/api", (req, res, next) => {
     return;
   }
   next();
+});
+
+// Endpoint serving beautiful parking space SVG icon
+app.get("/api/parking_space.svg", (req, res) => {
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="600" height="600" fill="#ffffff"/>
+  
+  <!-- Parking Sign Group -->
+  <g transform="translate(40, 60)">
+    <!-- Pole -->
+    <rect x="110" y="220" width="16" height="260" fill="#2d3748" rx="4"/>
+    <!-- Sign Box -->
+    <rect x="20" y="40" width="196" height="196" rx="32" fill="#2d3748"/>
+    <!-- P Letter -->
+    <text x="118" y="184" font-family="system-ui, -apple-system, sans-serif" font-size="140" font-weight="800" fill="#ffffff" text-anchor="middle">P</text>
+  </g>
+  
+  <!-- Car Group -->
+  <g transform="translate(240, 160)">
+    <!-- Car body & silhouette -->
+    <!-- Roof and windshield -->
+    <path d="M 120 140 L 220 140 Q 235 140 240 150 L 270 215 Q 275 225 260 225 L 80 225 Q 65 225 70 215 L 100 150 Q 105 140 120 140 Z" fill="#2d3748"/>
+    <!-- Windshield cutout (inner shape) -->
+    <path d="M 126 148 L 214 148 Q 224 148 227 155 L 253 212 Q 256 218 246 218 L 94 218 Q 84 218 87 212 L 113 155 Q 116 148 126 148 Z" fill="#ffffff"/>
+    
+    <!-- Lower Body -->
+    <path d="M 40 220 C 40 200, 300 200, 300 220 L 310 260 C 312 275, 298 290, 280 290 L 60 290 C 42 290, 28 275, 30 260 Z" fill="#2d3748"/>
+    
+    <!-- Headlights (Left & Right) -->
+    <path d="M 50 240 Q 80 230 95 250 Q 75 270 50 260 Z" fill="#ffffff"/>
+    <path d="M 290 240 Q 260 230 245 250 Q 265 270 290 260 Z" fill="#ffffff"/>
+    
+    <!-- Grille -->
+    <path d="M 120 252 Q 170 242 220 252 Q 215 272 170 272 Q 125 272 120 252 Z" fill="#ffffff"/>
+    <path d="M 125 255 Q 170 248 215 255 Q 210 268 170 268 Q 130 268 125 255 Z" fill="#2d3748"/>
+    
+    <!-- Wheels/Tires underneath -->
+    <rect x="52" y="286" width="36" height="24" rx="6" fill="#2d3748"/>
+    <rect x="252" y="286" width="36" height="24" rx="6" fill="#2d3748"/>
+    
+    <!-- Side Mirrors -->
+    <path d="M 40 225 Q 20 220 25 210 Q 35 210 42 220 Z" fill="#2d3748"/>
+    <path d="M 300 225 Q 320 220 315 210 Q 305 210 298 220 Z" fill="#2d3748"/>
+  </g>
+</svg>`;
+  res.send(svg);
 });
 
 // Helpers for escaping CSV and XML
@@ -65,90 +185,241 @@ interface FlatItem {
   floorNumber: number;
 }
 
-async function fetchAndExtractFlats(feedUrl: string): Promise<{ flats: FlatItem[]; error?: string; rawData?: any }> {
+function normalizeFeedUrl(input: string): string {
+  if (!input) return "";
+  const cleaned = input.trim();
+  
+  // If it's already a full URL, return as is
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+    return cleaned;
+  }
+
+  // Check if it is an API key with underscore like "311_H07j2kuqiaME..."
+  const apiKeyRegex = /^(\d+)_(.+)$/;
+  const match = cleaned.match(apiKeyRegex);
+  if (match) {
+    const id = match[1];
+    const token = match[2];
+    return `https://domoplaner.ru/dc-api/feeds/${id}-${token}/`;
+  }
+
+  // Check if it is a hyphenated API key like "311-H07j2kuqiaME..."
+  const hyphenRegex = /^(\d+)-(.+)$/;
+  const hyphenMatch = cleaned.match(hyphenRegex);
+  if (hyphenMatch) {
+    const id = hyphenMatch[1];
+    const token = hyphenMatch[2];
+    return `https://domoplaner.ru/dc-api/feeds/${id}-${token}/`;
+  }
+
+  return cleaned;
+}
+
+const CACHE_FILE = path.join(process.cwd(), "feed_cache.json");
+
+// In-memory cache to avoid disk I/O when possible
+let inMemoryCache: { [url: string]: { flats: FlatItem[]; rawData: any; timestamp: number } } = {};
+
+function getCachedData(feedUrl: string): { flats: FlatItem[]; rawData: any; timestamp: number } | null {
+  const normUrl = normalizeFeedUrl(feedUrl);
+  // Check in-memory first
+  if (inMemoryCache[normUrl]) {
+    return inMemoryCache[normUrl];
+  }
+  // Try reading from file
   try {
-    // Add cache busting parameter to feedUrl to bypass any CDN or intermediary cache
-    let finalUrl = feedUrl;
-    try {
-      const parsedUrl = new URL(feedUrl);
-      parsedUrl.searchParams.set("_t", String(Date.now()));
-      finalUrl = parsedUrl.toString();
-    } catch (e) {
-      if (feedUrl.includes("?")) {
-        finalUrl = `${feedUrl}&_t=${Date.now()}`;
-      } else {
-        finalUrl = `${feedUrl}?_t=${Date.now()}`;
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = fs.readFileSync(CACHE_FILE, "utf-8");
+      const cache = JSON.parse(data);
+      if (cache && cache[normUrl]) {
+        // Hydrate in-memory cache
+        inMemoryCache[normUrl] = cache[normUrl];
+        return cache[normUrl];
       }
     }
+  } catch (e) {
+    console.error("Error reading cache file:", e);
+  }
+  return null;
+}
 
-    const response = await fetch(finalUrl, {
+function saveCachedData(feedUrl: string, flats: FlatItem[], rawData: any) {
+  const normUrl = normalizeFeedUrl(feedUrl);
+  const entry = {
+    flats,
+    rawData,
+    timestamp: Date.now()
+  };
+  inMemoryCache[normUrl] = entry;
+
+  try {
+    let cache: any = {};
+    if (fs.existsSync(CACHE_FILE)) {
+      try {
+        const data = fs.readFileSync(CACHE_FILE, "utf-8");
+        cache = JSON.parse(data);
+      } catch (e) {
+        // ignore malformed JSON
+      }
+    }
+    cache[normUrl] = entry;
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error writing cache file:", e);
+  }
+}
+
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 30000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ...(options.headers || {})
+      },
+      signal: controller.signal
     });
-    if (!response.ok) {
-      return { flats: [], error: `Ошибка загрузки фида: ${response.status} ${response.statusText}` };
+    clearTimeout(id);
+    return response;
+  } catch (error: any) {
+    clearTimeout(id);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      throw new Error(`Превышено время ожидания ответа от фида (${Math.round(timeoutMs / 1000)} сек)`);
     }
-    const data = await response.json();
-    if (!data || typeof data !== 'object') {
-      return { flats: [], error: "Получен некорректный JSON фид" };
-    }
+    throw error;
+  }
+}
 
-    const extracted: FlatItem[] = [];
-    if (data.projects && Array.isArray(data.projects)) {
-      data.projects.forEach((project: any) => {
-        const houses: any[] = [];
-        if (project.houses_without_stage && Array.isArray(project.houses_without_stage)) {
-          houses.push(...project.houses_without_stage);
-        }
-        if (project.stages && Array.isArray(project.stages)) {
-          project.stages.forEach((stage: any) => {
-            if (stage.houses && Array.isArray(stage.houses)) {
-              houses.push(...stage.houses);
-            }
-          });
-        }
+// In-flight background fetch tracker to prevent duplicate requests
+const inFlightFetches: { [url: string]: Promise<any> } = {};
 
-        houses.forEach((house: any) => {
-          if (house.sections && Array.isArray(house.sections)) {
-            house.sections.forEach((section: any) => {
-              if (section.floors && Array.isArray(section.floors)) {
-                section.floors.forEach((floor: any) => {
-                  if (floor.flats && Array.isArray(floor.flats)) {
-                    floor.flats.forEach((flat: any) => {
-                      extracted.push({
-                        id: flat.id,
-                        number: flat.number,
-                        type: flat.type,
-                        status: flat.status,
-                        price: flat.price,
-                        area: flat.area,
-                        is_studio: flat.is_studio || 0,
-                        rooms: flat.rooms,
-                        rooms_sign: flat.rooms_sign,
-                        decoration_name: flat.decoration_name,
-                        images: flat.images || [],
-                        projectTitle: project.title,
-                        houseTitle: house.title,
-                        sectionTitle: section.title,
-                        floorNumber: floor.number
-                      });
-                    });
-                  }
-                });
+async function doBackgroundFetch(rawFeedUrl: string) {
+  const feedUrl = normalizeFeedUrl(rawFeedUrl);
+  if (inFlightFetches[feedUrl]) {
+    return inFlightFetches[feedUrl];
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      let finalUrl = feedUrl;
+      try {
+        const parsedUrl = new URL(feedUrl);
+        // Round timestamp to nearest 10 seconds to allow CDN re-use while keeping content fresh
+        const timeBucket = Math.floor(Date.now() / 10000) * 10;
+        parsedUrl.searchParams.set("_t", String(timeBucket));
+        finalUrl = parsedUrl.toString();
+      } catch (e) {
+        finalUrl = feedUrl;
+      }
+
+      console.log(`[BackgroundFetch] Fetching live feed data from ${finalUrl}...`);
+      const response = await fetchWithTimeout(finalUrl, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }, 30000);
+
+      if (!response.ok) {
+        console.warn(`[BackgroundFetch] Returned status ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+      if (!data || typeof data !== 'object') return null;
+
+      const extracted: FlatItem[] = [];
+      if (data.projects && Array.isArray(data.projects)) {
+        data.projects.forEach((project: any) => {
+          const houses: any[] = [];
+          if (project.houses_without_stage && Array.isArray(project.houses_without_stage)) {
+            houses.push(...project.houses_without_stage);
+          }
+          if (project.stages && Array.isArray(project.stages)) {
+            project.stages.forEach((stage: any) => {
+              if (stage.houses && Array.isArray(stage.houses)) {
+                houses.push(...stage.houses);
               }
             });
           }
+          houses.forEach((house: any) => {
+            if (house.sections && Array.isArray(house.sections)) {
+              house.sections.forEach((section: any) => {
+                if (section.floors && Array.isArray(section.floors)) {
+                  section.floors.forEach((floor: any) => {
+                    if (floor.flats && Array.isArray(floor.flats)) {
+                      floor.flats.forEach((flat: any) => {
+                        extracted.push({
+                          id: flat.id,
+                          number: flat.number,
+                          type: flat.type,
+                          status: flat.status,
+                          price: flat.price,
+                          area: flat.area,
+                          is_studio: flat.is_studio || 0,
+                          rooms: flat.rooms,
+                          rooms_sign: flat.rooms_sign,
+                          decoration_name: flat.decoration_name,
+                          images: flat.images || [],
+                          projectTitle: project.title,
+                          houseTitle: house.title,
+                          sectionTitle: section.title,
+                          floorNumber: floor.number
+                        });
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          });
         });
-      });
-    }
+      }
 
-    return { flats: extracted, rawData: data };
-  } catch (err: any) {
-    return { flats: [], error: `Исключение при получении фида: ${err.message}` };
+      if (extracted.length > 0) {
+        saveCachedData(feedUrl, extracted, data);
+        console.log(`[BackgroundFetch] Successfully updated cache with ${extracted.length} items`);
+      }
+      return extracted;
+    } catch (err: any) {
+      console.warn(`[BackgroundFetch] Notice while fetching feed: ${err.message}`);
+      return null;
+    } finally {
+      delete inFlightFetches[feedUrl];
+    }
+  })();
+
+  inFlightFetches[feedUrl] = fetchPromise;
+  return fetchPromise;
+}
+
+async function fetchAndExtractFlats(rawFeedUrl: string): Promise<{ flats: FlatItem[]; error?: string; rawData?: any }> {
+  const feedUrl = normalizeFeedUrl(rawFeedUrl);
+  const cached = getCachedData(feedUrl);
+  const CACHE_FRESHNESS_LIMIT = 15 * 1000; // 15 seconds
+
+  if (cached) {
+    const ageMs = Date.now() - cached.timestamp;
+    if (ageMs > CACHE_FRESHNESS_LIMIT) {
+      doBackgroundFetch(feedUrl);
+    }
+    return { flats: cached.flats, rawData: cached.rawData };
   }
+
+  const freshFlats = await doBackgroundFetch(feedUrl);
+  if (freshFlats && freshFlats.length > 0) {
+    return { flats: freshFlats };
+  }
+
+  const lastCached = getCachedData(feedUrl);
+  if (lastCached && lastCached.flats.length > 0) {
+    return { flats: lastCached.flats, rawData: lastCached.rawData };
+  }
+
+  return { flats: [], error: "Не удалось загрузить данный фид" };
 }
 
 // Endpoint 1: Health check
@@ -197,30 +468,63 @@ app.get("/api/feed-info", async (req, res) => {
     if (f.status === 0) typeStats[typeName].free++;
   });
 
+  const appHost = req.get("host") || process.env.APP_URL || `localhost:${PORT}`;
+  const appProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
+  const appUrl = `${appProto}://${appHost}`;
+
+  const mappedSample = flats.slice(0, 20).map(f => {
+    if (f.type === 1) {
+      return {
+        ...f,
+        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+      };
+    }
+    return f;
+  });
+
   res.json({
     totalCount: flats.length,
     freeCount: flats.filter(f => f.status === 0).length,
     projects: projectStats,
     houses: houseStats,
     types: typeStats,
-    sample: flats.slice(0, 20),
+    sample: mappedSample,
     feedUrl
   });
 });
 
-// Endpoint 3: Convert feed (YML or CSV)
-app.get("/api/feed-convert", async (req, res) => {
+// Helper handler for feed conversion to support both API route and direct file routes
+const feedConvertHandler = async (req: express.Request, res: express.Response) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
 
-  const feedUrl = (req.query.feedUrl as string) || "https://domoplaner.ru/dc-api/feeds/311-mTA43T5ivZbLiORunzQVnjsGdtjVuFDFQzFr466CDXX78Kz206M0ZaQjWLnO1soT/";
-  const format = (req.query.format as string) || "yml"; // "yml" or "csv"
-  const statusFilter = (req.query.statusFilter as string) || "free"; // "free" (0) or "all"
-  const typeFilter = (req.query.typeFilter as string) || "0,1,3"; // comma-separated list of types
-  const categoryType = (req.query.categoryType as string) || "property_type"; // "project", "project_house", "property_type", "combined"
-  const priceFormat = (req.query.priceFormat as string) || "full"; // "million" (e.g. 11.99 млн) or "full"
-  const includeLayout = (req.query.includeLayout as string) || "yes"; // "yes" or "no"
+  const saved = getSavedSettings();
+  const feedUrl = (req.query.feedUrl as string) || saved.feedUrl;
+  
+  // Resolve format based on route pathname or query parameter
+  let format = "yml";
+  if (req.path.endsWith(".csv")) {
+    format = "csv";
+  } else if (req.path.endsWith(".yml") || req.path.endsWith(".xml")) {
+    format = "yml";
+  } else {
+    format = (req.query.format as string) || "yml";
+  }
+
+  const statusFilter = (req.query.statusFilter as string) || saved.statusFilter;
+  
+  // Parse type filters (either from query or saved settings)
+  let allowedTypes: number[] = [];
+  if (req.query.typeFilter) {
+    allowedTypes = (req.query.typeFilter as string).split(',').map(t => parseInt(t.trim(), 10)).filter(t => !isNaN(t));
+  } else {
+    allowedTypes = saved.allowedTypes;
+  }
+
+  const categoryType = (req.query.categoryType as string) || saved.categoryType;
+  const priceFormat = (req.query.priceFormat as string) || saved.priceFormat;
+  const includeLayout = (req.query.includeLayout as string) || saved.includeLayout;
 
   const result = await fetchAndExtractFlats(feedUrl);
   if (result.error) {
@@ -228,15 +532,28 @@ app.get("/api/feed-convert", async (req, res) => {
     return;
   }
 
-  // Parse type filters
-  const allowedTypes = typeFilter.split(',').map(t => parseInt(t.trim(), 10)).filter(t => !isNaN(t));
-
   // Filter flats
   let filteredFlats = result.flats;
   if (statusFilter === "free") {
     filteredFlats = filteredFlats.filter(f => f.status === 0);
   }
   filteredFlats = filteredFlats.filter(f => allowedTypes.includes(f.type));
+
+  // Dynamically resolve correct public host and protocol (supporting secure proxy environments)
+  const appHost = req.get("host") || process.env.APP_URL || `localhost:${PORT}`;
+  const appProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
+  const appUrl = `${appProto}://${appHost}`;
+
+  // Override images for all parking spaces to use the custom SVG icon
+  filteredFlats = filteredFlats.map(f => {
+    if (f.type === 1) {
+      return {
+        ...f,
+        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+      };
+    }
+    return f;
+  });
 
   // Resolve category mapper
   const getCategoryName = (f: FlatItem) => {
@@ -319,86 +636,63 @@ app.get("/api/feed-convert", async (req, res) => {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=domoplaner_tilda_catalog.csv");
 
-    // Exact Tilda CSV columns as per user's example with added Properties for range slider filtering
-    const headerRow = `"Tilda UID";Brand;SKU;Mark;Category;Title;Description;Text;Photo;Price;Quantity;"Price Old";Editions;Modifications;"External ID";"Parent UID";Characteristics:Проект;Characteristics:Секция;Characteristics:Этаж;"Characteristics:Тип объекта";Characteristics:Площадь;Characteristics:Отделка;"Characteristics:Номер на этаже";"Characteristics:ID объекта";Properties:Площадь;Properties:Этаж;Weight;Length;Width;Height;"SEO title";"SEO descr";"SEO keywords";"FB title";"FB descr"`;
+    // Exact Tilda CSV columns as per user's provided example with added rooms count
+    const headerRow = "SKU;Category;Title;Description;Text;Photo;Price;Quantity;Price Old;Editions;Modifications;External ID;Parent UID;VAT;FFD1;FFD2;Characteristics: Кол-во комнат";
     let csvContent = "\ufeff" + headerRow + "\n"; // Include UTF-8 BOM for Excel support
 
     filteredFlats.forEach(f => {
-      const flatIdNum = typeof f.id === 'number' ? f.id : parseInt(String(f.id), 10) || 0;
-      const tildaUid = String(300000000000 + flatIdNum);
       const sku = String(f.id); // SKU = Id объекта
       const category = getCategoryName(f);
       const title = getFlatName(f);
-      
-      const description = "";
-      
-      const text = ""; // Empty as in user's example, characteristics are separate
-      const photo = f.images.map(img => img.src).join(",");
-      const price = f.price || "";
+      const description = getFlatDescription(f);
+      const text = getFlatText(f);
+      const photo = f.images && f.images.length > 0 ? f.images.map(img => img.src).join(",") : "";
+      const price = f.price ? f.price.toFixed(4) : "";
       const quantity = f.status === 0 ? "1" : "0";
+      const priceOld = "";
+      const editions = "";
+      const modifications = "";
       const extId = String(f.id);
+      const parentUid = "";
+      const vat = "";
+      const ffd1 = "commodity";
+      const ffd2 = "full_payment";
 
-      // Characteristics & Properties
-      const sectionValue = f.sectionTitle ? f.sectionTitle.replace(/^Секция\s+/i, "") : "";
-      const projectValue = f.projectTitle;
-      const floorValue = String(f.floorNumber);
-      const typeLabel = f.type === 0 ? "Квартира" : f.type === 1 ? "Машиноместо" : f.type === 3 ? "Коммерция" : "Другое";
-      const areaValue = String(f.area);
-      const decorationValue = f.decoration_name || "Без отделки";
-      const numberOnFloorValue = String(f.number);
-
-      // Dynamic SEO strings matching your style
-      const seoTitle = `${title}. Жилой комплекс "${f.projectTitle}"`;
-      
-      let roomsWord = "Помещение";
+      let roomsCountValue = "";
       if (f.type === 0) {
-        roomsWord = f.is_studio ? "Студия" : f.rooms === 1 ? "Однокомнатная квартира" : f.rooms === 2 ? "Двухкомнатная квартира" : f.rooms === 3 ? "Трехкомнатная квартира" : `${f.rooms}-комнатная квартира`;
-      } else if (f.type === 1) {
-        roomsWord = "Машиноместо";
-      } else if (f.type === 3) {
-        roomsWord = "Коммерческое помещение";
+        if (f.is_studio || f.rooms === 0 || (f.rooms_sign && String(f.rooms_sign).toLowerCase().includes("студ"))) {
+          roomsCountValue = "Студия";
+        } else if (f.rooms !== null && f.rooms !== undefined) {
+          roomsCountValue = String(f.rooms);
+        } else if (f.rooms_sign) {
+          const parsed = parseInt(String(f.rooms_sign), 10);
+          roomsCountValue = !isNaN(parsed) ? String(parsed) : "1";
+        } else {
+          const areaNum = typeof f.area === 'number' ? f.area : parseFloat(String(f.area)) || 0;
+          roomsCountValue = (areaNum > 0 && areaNum < 28) ? "Студия" : "1";
+        }
+      } else {
+        roomsCountValue = "";
       }
-      
-      const seoDescr = `${roomsWord} №${f.number}, ${f.area} м². Жилой комплекс "${f.projectTitle}". Новостройка. Ипотека. Рассрочка. Наличные`;
-      const roomsKeyword = f.type === 0 && f.rooms ? `${f.rooms}, комнатная, ` : "";
-      const seoKeywords = `ЖК ${f.projectTitle}, новостройка, ${roomsKeyword}ипотека, рассрочка, застройщик`;
 
       const row = [
-        tildaUid, // Tilda UID (Product ID)
-        "", // Brand
-        sku, // SKU (Id объекта)
-        "", // Mark
-        category, // Category
-        title, // Title
-        description, // Description
-        text, // Text
-        photo, // Photo
-        price, // Price
-        quantity, // Quantity
-        "", // Price Old
-        "", // Editions
-        "", // Modifications
-        extId, // External ID
-        "", // Parent UID
-        projectValue, // Characteristics:Проект
-        sectionValue, // Characteristics:Секция
-        floorValue, // Characteristics:Этаж
-        typeLabel, // Characteristics:Тип объекта
-        areaValue, // Characteristics:Площадь
-        decorationValue, // Characteristics:Отделка
-        numberOnFloorValue, // Characteristics:Номер на этаже
-        extId, // Characteristics:ID объекта
-        areaValue, // Properties:Площадь (Numeric range filter slider support)
-        floorValue, // Properties:Этаж (Numeric range filter slider support)
-        "0", // Weight
-        "0", // Length
-        "0", // Width
-        "0", // Height
-        seoTitle, // SEO title
-        seoDescr, // SEO descr
-        seoKeywords, // SEO keywords
-        "", // FB title
-        ""  // FB descr
+        sku,
+        category,
+        title,
+        description,
+        text,
+        photo,
+        price,
+        quantity,
+        priceOld,
+        editions,
+        modifications,
+        extId,
+        parentUid,
+        vat,
+        ffd1,
+        ffd2,
+        roomsCountValue
       ];
 
       csvContent += row.map(val => escapeCSV(val)).join(";") + "\n";
@@ -482,6 +776,31 @@ app.get("/api/feed-convert", async (req, res) => {
       const sectionValue = f.sectionTitle ? f.sectionTitle.replace(/^Секция\s+/i, "") : "";
       const typeLabel = f.type === 0 ? "Квартира" : f.type === 1 ? "Машиноместо" : f.type === 3 ? "Коммерция" : "Другое";
 
+      let roomsCountYml = "";
+      if (f.type === 0) {
+        if (f.is_studio || f.rooms === 0 || (f.rooms_sign && String(f.rooms_sign).toLowerCase().includes("студ"))) {
+          roomsCountYml = "Студия";
+        } else if (f.rooms !== null && f.rooms !== undefined) {
+          roomsCountYml = String(f.rooms);
+        } else if (f.rooms_sign) {
+          const parsed = parseInt(String(f.rooms_sign), 10);
+          if (!isNaN(parsed)) {
+            roomsCountYml = String(parsed);
+          } else {
+            roomsCountYml = "1";
+          }
+        } else {
+          const areaNum = typeof f.area === 'number' ? f.area : parseFloat(String(f.area)) || 0;
+          roomsCountYml = (areaNum > 0 && areaNum < 28) ? "Студия" : "1";
+        }
+      } else if (f.type === 1) {
+        roomsCountYml = "Паркинг";
+      } else if (f.type === 3) {
+        roomsCountYml = "Коммерция";
+      } else {
+        roomsCountYml = "Другое";
+      }
+
       yml += `        <param name="Проект">${escapeXML(f.projectTitle)}</param>\n`;
       yml += `        <param name="Секция">${escapeXML(sectionValue)}</param>\n`;
       yml += `        <param name="Этаж">${f.floorNumber}</param>\n`;
@@ -490,6 +809,8 @@ app.get("/api/feed-convert", async (req, res) => {
       yml += `        <param name="Отделка">${escapeXML(f.decoration_name || "Без отделки")}</param>\n`;
       yml += `        <param name="Номер на этаже">${escapeXML(String(f.number))}</param>\n`;
       yml += `        <param name="ID объекта">${f.id}</param>\n`;
+      yml += `        <param name="Кол-во комнат">${escapeXML(roomsCountYml)}</param>\n`;
+      yml += `        <param name="Characteristics: Кол-во комнат">${escapeXML(roomsCountYml)}</param>\n`;
       yml += `      </offer>\n`;
     });
 
@@ -499,6 +820,24 @@ app.get("/api/feed-convert", async (req, res) => {
 
     res.send(yml);
   }
+};
+
+// Bind feed convert routes
+app.get("/api/feed-convert", feedConvertHandler);
+app.get("/feed.yml", feedConvertHandler);
+app.get("/feed.xml", feedConvertHandler);
+app.get("/feed.csv", feedConvertHandler);
+
+// Settings storage endpoints
+app.get("/api/get-settings", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.json(getSavedSettings());
+});
+
+app.post("/api/save-settings", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  saveSettings(req.body);
+  res.json({ status: "ok", settings: getSavedSettings() });
 });
 
 // Setup Webhook Log type and array
@@ -514,7 +853,7 @@ interface WebhookLog {
 const webhookLogs: WebhookLog[] = [];
 
 // Endpoint 4: Get clean converted JSON (with CORS enabled for external widgets!)
-app.get("/api/feed-json", async (req, res) => {
+const feedJsonHandler = async (req: express.Request, res: express.Response) => {
   // Enable CORS with Credentials support to bypass AI Studio development environment Cookie Check
   const origin = req.headers.origin || "*";
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -534,12 +873,20 @@ app.get("/api/feed-json", async (req, res) => {
     return;
   }
 
-  const feedUrl = (req.query.feedUrl as string) || "https://domoplaner.ru/dc-api/feeds/311-mTA43T5ivZbLiORunzQVnjsGdtjVuFDFQzFr466CDXX78Kz206M0ZaQjWLnO1soT/";
-  const statusFilter = (req.query.statusFilter as string) || "free"; 
-  const typeFilter = (req.query.typeFilter as string) || "0,1,3";
-  const categoryType = (req.query.categoryType as string) || "combined";
-  const priceFormat = (req.query.priceFormat as string) || "full";
-  const includeLayout = (req.query.includeLayout as string) || "yes";
+  const saved = getSavedSettings();
+  const feedUrl = (req.query.feedUrl as string) || saved.feedUrl;
+  const statusFilter = (req.query.statusFilter as string) || saved.statusFilter;
+  
+  let allowedTypes: number[] = [];
+  if (req.query.typeFilter) {
+    allowedTypes = (req.query.typeFilter as string).split(',').map(t => parseInt(t.trim(), 10)).filter(t => !isNaN(t));
+  } else {
+    allowedTypes = saved.allowedTypes;
+  }
+
+  const categoryType = (req.query.categoryType as string) || saved.categoryType;
+  const priceFormat = (req.query.priceFormat as string) || saved.priceFormat;
+  const includeLayout = (req.query.includeLayout as string) || saved.includeLayout;
 
   const result = await fetchAndExtractFlats(feedUrl);
   if (result.error) {
@@ -547,13 +894,27 @@ app.get("/api/feed-json", async (req, res) => {
     return;
   }
 
-  const allowedTypes = typeFilter.split(',').map(t => parseInt(t.trim(), 10)).filter(t => !isNaN(t));
-
   let filteredFlats = result.flats;
   if (statusFilter === "free") {
     filteredFlats = filteredFlats.filter(f => f.status === 0);
   }
   filteredFlats = filteredFlats.filter(f => allowedTypes.includes(f.type));
+
+  // Dynamically resolve correct public host and protocol (supporting secure proxy environments)
+  const appHost = req.get("host") || process.env.APP_URL || `localhost:${PORT}`;
+  const appProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
+  const appUrl = `${appProto}://${appHost}`;
+
+  // Override images for all parking spaces to use the custom SVG icon
+  filteredFlats = filteredFlats.map(f => {
+    if (f.type === 1) {
+      return {
+        ...f,
+        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+      };
+    }
+    return f;
+  });
 
   const getCategoryName = (f: FlatItem) => {
     const typeName = f.type === 0 ? "Квартиры" : f.type === 1 ? "Паркинг" : f.type === 3 ? "Коммерция" : "Другие помещения";
@@ -598,6 +959,31 @@ app.get("/api/feed-json", async (req, res) => {
   };
 
   const formatted = filteredFlats.map(f => {
+    let roomsCountValue = "";
+    if (f.type === 0) {
+      if (f.is_studio || f.rooms === 0 || (f.rooms_sign && String(f.rooms_sign).toLowerCase().includes("студ"))) {
+        roomsCountValue = "Студия";
+      } else if (f.rooms !== null && f.rooms !== undefined) {
+        roomsCountValue = String(f.rooms);
+      } else if (f.rooms_sign) {
+        const parsed = parseInt(String(f.rooms_sign), 10);
+        if (!isNaN(parsed)) {
+          roomsCountValue = String(parsed);
+        } else {
+          roomsCountValue = "1";
+        }
+      } else {
+        const areaNum = typeof f.area === 'number' ? f.area : parseFloat(String(f.area)) || 0;
+        roomsCountValue = (areaNum > 0 && areaNum < 28) ? "Студия" : "1";
+      }
+    } else if (f.type === 1) {
+      roomsCountValue = "Паркинг";
+    } else if (f.type === 3) {
+      roomsCountValue = "Коммерция";
+    } else {
+      roomsCountValue = "Другое";
+    }
+
     return {
       id: f.id,
       sku: `DOMO-${f.id}`,
@@ -614,12 +1000,17 @@ app.get("/api/feed-json", async (req, res) => {
       house: f.houseTitle,
       project: f.projectTitle,
       section: f.sectionTitle,
-      images: f.images.map(img => img.src)
+      images: f.images.map(img => img.src),
+      roomsCount: roomsCountValue,
+      "Characteristics: Кол-во комнат": roomsCountValue
     };
   });
 
   res.json(formatted);
-});
+};
+
+app.get("/api/feed-json", feedJsonHandler);
+app.get("/feed.json", feedJsonHandler);
 
 // Endpoint 5: Webhook receiver from Domoplaner
 app.post("/api/webhook/domoplaner", (req, res) => {

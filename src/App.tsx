@@ -879,8 +879,28 @@ export default function App() {
 }
 .custom-sync-status-badge, .t-store__card__mark, .js-store-prod-mark {
   border-radius: 0 !important;
-  font-family: 'Montserrat', Montserrat, Arial, sans-serif !important;
+  font-family: Montserrat, Arial, sans-serif !important;
   border: none !important;
+}
+.custom-sync-status-badge {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 10 !important;
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  border: none !important;
+}
+.custom-sync-status-badge.status-free {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+}
+.custom-sync-status-badge.status-booked {
+  background-color: #fff7ed !important;
+  color: #c2410c !important;
 }
 </style>
 <script>
@@ -1045,7 +1065,6 @@ export default function App() {
         if (!badge) {
           badge = document.createElement('div');
           badge.className = 'custom-sync-status-badge';
-          badge.style.cssText = 'position:absolute;top:10px;right:10px;z-index:10;padding:4px 8px;border-radius:0 !important;font-family:\'Montserrat\',Montserrat,Arial,sans-serif !important;font-size:10px;font-weight:bold;text-transform:uppercase;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:none !important;';
           
           const imgWrapper = el.querySelector('.t-store__card__imgwrapper, .js-product-img, .t-bgimg, .t-store__prod-popup__slider, .t-slds__container');
           if (imgWrapper) {
@@ -1059,10 +1078,7 @@ export default function App() {
 
         if (isAvailable) {
           badge.textContent = 'Свободно';
-          badge.style.backgroundColor = '#ecfdf5';
-          badge.style.color = '#047857';
-          badge.style.border = 'none';
-          
+          badge.className = 'custom-sync-status-badge status-free';
           btnElements.forEach(btn => {
             btn.style.display = '';
             btn.style.pointerEvents = 'auto';
@@ -1076,10 +1092,7 @@ export default function App() {
           });
         } else {
           badge.textContent = 'Забронировано';
-          badge.style.backgroundColor = '#fff7ed';
-          badge.style.color = '#c2410c';
-          badge.style.border = 'none';
-          
+          badge.className = 'custom-sync-status-badge status-booked';
           btnElements.forEach(btn => {
             btn.textContent = 'Забронировано';
             btn.style.backgroundColor = '#cbd5e1';

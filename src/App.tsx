@@ -359,6 +359,10 @@ export default function App() {
 }
 
 /* Скрытие всплывающего поп-апа с ошибкой формы Tilda "Пожалуйста, заполните все обязательные поля" */
+#tilda-popup-for-error,
+.tilda-popup-for-error,
+.t-popup#tilda-popup-for-error,
+[id*="tilda-popup-for-error"],
 .t-form__errorbox-text,
 .t-form__errorbox-wrapper,
 .t-form__errorbox-item,
@@ -521,7 +525,7 @@ export default function App() {
       }
     });
 
-    var errorBoxes = document.querySelectorAll('.t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
+    var errorBoxes = document.querySelectorAll('#tilda-popup-for-error, [id*="tilda-popup-for-error"], .tilda-popup-for-error, .t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
     errorBoxes.forEach(function(box) {
       box.style.setProperty('display', 'none', 'important');
       box.style.setProperty('visibility', 'hidden', 'important');
@@ -530,6 +534,9 @@ export default function App() {
       box.style.setProperty('padding', '0', 'important');
       box.style.setProperty('margin', '0', 'important');
       box.style.setProperty('pointer-events', 'none', 'important');
+      if (box.classList.contains('t-popup_show')) {
+        box.classList.remove('t-popup_show');
+      }
     });
   }
 
@@ -902,6 +909,10 @@ export default function App() {
   background-color: #fff7ed !important;
   color: #c2410c !important;
 }
+.custom-sync-status-badge.status-sold {
+  background-color: #fef2f2 !important;
+  color: #b91c1c !important;
+}
 </style>
 <script>
 (function() {
@@ -920,9 +931,15 @@ export default function App() {
       showMoreBtns.forEach(btn => {
         btn.style.setProperty('display', 'none', 'important');
       });
-      const errorBoxes = document.querySelectorAll('.t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
+      const errorBoxes = document.querySelectorAll('#tilda-popup-for-error, [id*="tilda-popup-for-error"], .tilda-popup-for-error, .t-form__errorbox-text, .t-form__errorbox-wrapper, .t-form__errorbox-item, .t-form__errorbox-middle, .t-form__errorbox-bottom, .js-errorbox-all, .js-error-box-all, [class*="t-form__errorbox"]');
       errorBoxes.forEach(box => {
         box.style.setProperty('display', 'none', 'important');
+        box.style.setProperty('visibility', 'hidden', 'important');
+        box.style.setProperty('opacity', '0', 'important');
+        box.style.setProperty('pointer-events', 'none', 'important');
+        if (box.classList.contains('t-popup_show')) {
+          box.classList.remove('t-popup_show');
+        }
       });
     } catch(e) {}
   }
@@ -1057,8 +1074,13 @@ export default function App() {
           }
         }
 
-        // 2. Обновляем статус бронирования
-        const isAvailable = flat.status === 0;
+        // 2. Обновляем статус бронирования и наличия
+        const stNum = flat.status !== undefined && flat.status !== null ? Number(flat.status) : 0;
+        const stStr = String(flat.status || '').toLowerCase();
+        
+        const isFree = stNum === 0 || stStr === '0' || stStr === 'free' || stStr === 'свободно';
+        const isBooked = stNum === 1 || stStr === '1' || stStr === 'booked' || stStr === ' забронировано' || stStr === 'reserved';
+        
         const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn');
         
         let badge = el.querySelector('.custom-sync-status-badge');
@@ -1076,26 +1098,37 @@ export default function App() {
           }
         }
 
-        if (isAvailable) {
+        if (isFree) {
           badge.textContent = 'Свободно';
           badge.className = 'custom-sync-status-badge status-free';
           btnElements.forEach(btn => {
             btn.style.display = '';
             btn.style.pointerEvents = 'auto';
             btn.style.opacity = '1';
-            if (btn.textContent.includes('Забронировано')) {
+            if (btn.textContent.includes('Забронировано') || btn.textContent.includes('Продано')) {
               btn.textContent = 'Выбрать';
               btn.style.backgroundColor = '';
               btn.style.color = '';
               btn.style.borderColor = '';
             }
           });
-        } else {
+        } else if (isBooked) {
           badge.textContent = 'Забронировано';
           badge.className = 'custom-sync-status-badge status-booked';
           btnElements.forEach(btn => {
             btn.textContent = 'Забронировано';
-            btn.style.backgroundColor = '#cbd5e1';
+            btn.style.backgroundColor = '#fff7ed';
+            btn.style.color = '#c2410c';
+            btn.style.borderColor = '#fdba74';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.85';
+          });
+        } else {
+          badge.textContent = 'Продано';
+          badge.className = 'custom-sync-status-badge status-sold';
+          btnElements.forEach(btn => {
+            btn.textContent = 'Продано';
+            btn.style.backgroundColor = '#e2e8f0';
             btn.style.color = '#64748b';
             btn.style.borderColor = '#cbd5e1';
             btn.style.pointerEvents = 'none';
@@ -1683,8 +1716,8 @@ export default function App() {
                               {f.price ? f.price.toLocaleString('ru-RU') + ' ₽' : 'Не указана'}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-sm uppercase tracking-wide ${f.status === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-orange-50 text-orange-700 border border-orange-100'}`}>
-                                {f.status === 0 ? 'Свободно' : 'Забронировано'}
+                              <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-sm uppercase tracking-wide ${f.status === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : f.status === 1 ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+                                {f.status === 0 ? 'Свободно' : f.status === 1 ? 'Забронировано' : 'Продано'}
                               </span>
                             </td>
                           </tr>
@@ -1918,7 +1951,7 @@ export default function App() {
                     <h3 className="font-bold text-sm text-slate-900 font-display">Скрипт «Живой авто-синхронизатор» цен и бронирования (для CSV импорта)</h3>
                   </div>
                   <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                    Если вы импортируете каталог через <strong>CSV таблицы в Tilda</strong>, товары на вашем сайте остаются статичными. Данный умный скрипт решает эту проблему! Вставьте его в блок <strong>T123 (HTML-код)</strong> на странице вашего каталога Tilda. Он будет на лету получать свежие цены и статусы из Domoplaner через наш мост, сопоставлять товары по ID и мгновенно обновлять цены, а также вывешивать цветные бэйджи <b>«Свободно»</b> / <b>«Забронировано»</b> прямо на карточках товаров.
+                    Если вы импортируете каталог через <strong>CSV таблицы в Tilda</strong>, товары на вашем сайте остаются статичными. Данный умный скрипт решает эту проблему! Вставьте его в блок <strong>T123 (HTML-код)</strong> на странице вашего каталога Tilda. Он будет на лету получать свежие цены и статусы из Domoplaner через наш мост, сопоставлять товары по ID и мгновенно обновлять цены, а также вывешивать цветные бэйджи <b>«Свободно»</b> / <b>«Забронировано»</b> / <b>«Продано»</b> прямо на карточках товаров.
                   </p>
 
                   <div className="mb-6">

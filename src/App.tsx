@@ -965,15 +965,28 @@ export default function App() {
       '.t-store__card__wrapper',
       '.t-store__prod-popup',
       '.js-store-prod-popup',
+      '.t-store__product-snippet',
+      '.t-store__product-page',
+      '.t-store__product-full',
+      '.t-store__product-detail',
+      '.js-product-snippet',
+      '.js-store-product-snippet',
       '.t-popup_show .js-product',
       '.t-popup_show .t-store__prod-popup',
+      '.t-popup_show .t-store__product-snippet',
       '[data-product-lid]',
       '[data-product-id]',
       '[data-product-sku]',
-      '[data-product-gen-uid]'
+      '[data-product-gen-uid]',
+      '[data-product-uid]'
     ];
 
-    const productElements = document.querySelectorAll(selectors.join(', '));
+    let productElements = Array.from(document.querySelectorAll(selectors.join(', ')));
+    if (productElements.length === 0 && (window.location.pathname.indexOf('/object/') !== -1 || document.querySelector('.t-store__product-snippet, .t-store__product-page'))) {
+      const fallbackContainer = document.querySelector('.t-store__product-snippet, .t-store__product-page, .js-product-snippet, #allrecords, body');
+      if (fallbackContainer) productElements = [fallbackContainer];
+    }
+
     productElements.forEach(el => {
       try {
         let lid = el.getAttribute('data-product-lid') || 
@@ -987,18 +1000,34 @@ export default function App() {
                   el.getAttribute('data-product-external-id') || 
                   el.getAttribute('data-sku') || 
                   el.getAttribute('data-product-code') || '';
+
+        if (typeof window !== 'undefined') {
+          const winProd = window.product || window.t_store_product || window.t_store_product_data || window.tilda_product;
+          if (winProd) {
+            if (!sku && winProd.sku) sku = String(winProd.sku);
+            if (!sku && winProd.external_id) sku = String(winProd.external_id);
+            if (!lid && (winProd.lid || winProd.id || winProd.uid)) lid = String(winProd.lid || winProd.id || winProd.uid);
+          }
+        }
         
         if (!sku) {
-          const skuEl = el.querySelector('.js-store-prod-sku, .t-store__prod-popup__sku, .t-store__card__sku, .js-product-sku, [data-product-sku], input[name="sku"]');
+          const skuEl = el.querySelector('.js-store-prod-sku, .t-store__prod-popup__sku, .t-store__product-snippet__sku, .t-store__card__sku, .js-product-sku, [data-product-sku], input[name="sku"], [data-sku], .js-product-edition-option');
           if (skuEl) {
-            sku = skuEl.getAttribute('data-product-sku') || skuEl.value || skuEl.textContent.replace(/Артикул:\\s*/i, '').replace(/SKU:\\s*/i, '').trim();
+            sku = skuEl.getAttribute('data-product-sku') || skuEl.value || skuEl.textContent.replace(/Артикул:\s*/i, '').replace(/SKU:\s*/i, '').replace(/Арт:\s*/i, '').trim();
           }
         }
 
         if (!lid) {
-          const lidEl = el.querySelector('[data-product-lid], [data-product-id]');
+          const lidEl = el.querySelector('[data-product-lid], [data-product-id], [data-product-gen-uid]');
           if (lidEl) {
-            lid = lidEl.getAttribute('data-product-lid') || lidEl.getAttribute('data-product-id') || '';
+            lid = lidEl.getAttribute('data-product-lid') || lidEl.getAttribute('data-product-id') || lidEl.getAttribute('data-product-gen-uid') || '';
+          }
+        }
+
+        if (!lid && !sku && typeof window !== 'undefined' && window.location) {
+          const urlMatch = window.location.pathname.match(/\/object\/(\d+)/);
+          if (urlMatch) {
+            lid = urlMatch[1];
           }
         }
         
@@ -1020,22 +1049,20 @@ export default function App() {
         }
 
         if (!flat) {
-          const txt = el.textContent || '';
-          const domoMatch = txt.match(/DOMO-(\\d+)/i);
+          const txt = (el.textContent || '') + ' ' + (document.title || '');
+          const domoMatch = txt.match(/DOMO-(\d+)/i);
           if (domoMatch && flatMap[domoMatch[1]]) {
             flat = flatMap[domoMatch[1]];
           } else {
-            const flatNumMatch = txt.match(/№\\s*(\\d+[А-Яа-яA-Za-z]?)/i);
+            const flatNumMatch = txt.match(/№\s*(\d+[А-Яа-яA-Za-z]?)/i);
             if (flatNumMatch && flatByNumber[flatNumMatch[1]]) {
               flat = flatByNumber[flatNumMatch[1]];
             }
           }
         }
 
-        if (!flat) return;
-
-        // 1. Обновляем цену
-        if (flat.price && Number(flat.price) > 0) {
+        // 1. Обновляем цену, если объект найден
+        if (flat && flat.price && Number(flat.price) > 0) {
           const rawPrice = Number(flat.price);
           const formattedPrice = rawPrice.toLocaleString('ru-RU') + ' ₽';
           
@@ -1050,7 +1077,7 @@ export default function App() {
             child.setAttribute('data-product-price-def-str', String(rawPrice) + ',00');
           });
 
-          const priceElements = el.querySelectorAll('.js-store-prod-price, .js-product-price, .t-store__card__price, .t-store__prod-popup__price-new, .t-store__card__price-value, .t-store__card__price_val, .js-store-prod-price-val, .t-store__prod-popup__price-value, .t-store__prod-popup__price');
+          const priceElements = el.querySelectorAll('.js-store-prod-price, .js-product-price, .t-store__card__price, .t-store__prod-popup__price-new, .t-store__card__price-value, .t-store__card__price_val, .js-store-prod-price-val, .t-store__prod-popup__price-value, .t-store__prod-popup__price, .t-store__product-snippet__price');
           priceElements.forEach(pe => {
             const isValueOnly = pe.classList.contains('js-store-prod-price-val') || 
                                 pe.classList.contains('t-store__card__price-value') || 
@@ -1071,41 +1098,59 @@ export default function App() {
             }
           });
 
-          if (typeof window.product !== 'undefined' && window.product && (String(window.product.sku) === String(flat.id) || String(window.product.lid) === String(lid))) {
-            window.product.price = String(rawPrice) + '.0000';
-          } else if (typeof product !== 'undefined' && product && (String(product.sku) === String(flat.id) || String(product.lid) === String(lid))) {
-            product.price = String(rawPrice) + '.0000';
+          if (typeof window !== 'undefined') {
+            if (typeof window.product !== 'undefined' && window.product && (String(window.product.sku) === String(flat.id) || String(window.product.lid) === String(lid))) {
+              window.product.price = String(rawPrice) + '.0000';
+            } else if (typeof product !== 'undefined' && product && (String(product.sku) === String(flat.id) || String(product.lid) === String(lid))) {
+              product.price = String(rawPrice) + '.0000';
+            }
           }
         }
 
-        // 2. Обновляем статус бронирования и наличия
-        const stNum = flat.status !== undefined && flat.status !== null ? Number(flat.status) : 0;
-        const stStr = String(flat.status || '').toLowerCase();
+        // 2. Классифицируем статус объекта (Свободно / Забронировано / Продано / Корректируется если статус не удалось определить)
+        let statusCategory = 'tech'; // по умолчанию "Корректируется" если статус не удалось определить
+
+        if (flat && flat.status !== undefined && flat.status !== null) {
+          const stNum = Number(flat.status);
+          const stStr = String(flat.status || '').toLowerCase().trim();
+
+          if (stNum === 0 || stStr === '0' || stStr === 'free' || stStr === 'свободно') {
+            statusCategory = 'free';
+          } else if (stNum === 1 || stStr === '1' || stStr === 'booked' || stStr.includes('забронирован') || stStr === 'бронь' || stStr === 'reserved') {
+            statusCategory = 'booked';
+          } else if (stNum === 3 || stStr === '3' || stStr === 'sold' || stStr.includes('продан') || stStr === 'продано') {
+            statusCategory = 'sold';
+          } else if (stNum === 2 || stStr === '2' || stStr === 'tech' || stStr.includes('тех') || stStr.includes('коррект')) {
+            statusCategory = 'tech';
+          } else {
+            statusCategory = 'tech'; // в случае нераспознанного статуса -> "Корректируется"
+          }
+        } else {
+          statusCategory = 'tech'; // в случае если статус не удалось определить -> "Корректируется"
+        }
         
-        const isFree = stNum === 0 || stStr === '0' || stStr === 'free' || stStr === 'свободно';
-        const isBooked = stNum === 1 || stStr === '1' || stStr === 'booked' || stStr.includes('забронирован') || stStr === 'бронь' || stStr === 'reserved';
-        const isTech = stNum === 2 || stStr === '2' || stStr === 'tech' || stStr === 'tech_booked' || stStr.includes('тех') || stStr.includes('коррект');
-        
-        const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn');
-        
+        const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn, .t-store__product-snippet__btn, .js-store-btn, .t-store__prod-popup__buy-btn, .js-store-prod-popup-buy-btn');
+        const tildaMarks = el.querySelectorAll('.t-store__card__mark, .js-store-prod-mark, .t-store__prod-popup__mark, .t-store__product-snippet__mark, .js-product-mark');
+
         let badge = el.querySelector('.custom-sync-status-badge');
         if (!badge) {
           badge = document.createElement('div');
           badge.className = 'custom-sync-status-badge';
           
-          const imgWrapper = el.querySelector('.t-store__card__imgwrapper, .js-product-img, .t-bgimg, .t-store__prod-popup__slider, .t-slds__container');
-          if (imgWrapper) {
-            imgWrapper.style.position = 'relative';
-            imgWrapper.appendChild(badge);
+          const targetWrapper = el.querySelector('.t-store__card__imgwrapper, .js-product-img, .t-bgimg, .t-store__prod-popup__slider, .t-store__product-snippet__slider, .t-slds__container, .t-store__product-snippet__gallery, .t-store__prod-popup__info, .t-store__product-snippet__info, .t-store__prod-popup__title-wrapper');
+          if (targetWrapper) {
+            targetWrapper.style.position = 'relative';
+            targetWrapper.appendChild(badge);
           } else {
             el.style.position = 'relative';
             el.appendChild(badge);
           }
         }
 
-        if (isFree) {
+        if (statusCategory === 'free') {
           badge.textContent = 'Свободно';
           badge.className = 'custom-sync-status-badge status-free';
+          tildaMarks.forEach(m => { m.textContent = 'Свободно'; m.style.backgroundColor = '#ecfdf5'; m.style.color = '#047857'; });
           btnElements.forEach(btn => {
             btn.style.display = '';
             btn.style.pointerEvents = 'auto';
@@ -1117,9 +1162,10 @@ export default function App() {
               btn.style.borderColor = '';
             }
           });
-        } else if (isBooked) {
+        } else if (statusCategory === 'booked') {
           badge.textContent = 'Забронировано';
           badge.className = 'custom-sync-status-badge status-booked';
+          tildaMarks.forEach(m => { m.textContent = 'Забронировано'; m.style.backgroundColor = '#fff7ed'; m.style.color = '#c2410c'; });
           btnElements.forEach(btn => {
             btn.textContent = 'Забронировано';
             btn.style.backgroundColor = '#fff7ed';
@@ -1128,20 +1174,10 @@ export default function App() {
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.85';
           });
-        } else if (isTech) {
-          badge.textContent = 'Корректируется';
-          badge.className = 'custom-sync-status-badge status-tech';
-          btnElements.forEach(btn => {
-            btn.textContent = 'Корректируется';
-            btn.style.backgroundColor = '#fefce8';
-            btn.style.color = '#a16207';
-            btn.style.borderColor = '#fde047';
-            btn.style.pointerEvents = 'none';
-            btn.style.opacity = '0.85';
-          });
-        } else {
+        } else if (statusCategory === 'sold') {
           badge.textContent = 'Продано';
           badge.className = 'custom-sync-status-badge status-sold';
+          tildaMarks.forEach(m => { m.textContent = 'Продано'; m.style.backgroundColor = '#fef2f2'; m.style.color = '#b91c1c'; });
           btnElements.forEach(btn => {
             btn.textContent = 'Продано';
             btn.style.backgroundColor = '#e2e8f0';
@@ -1149,6 +1185,18 @@ export default function App() {
             btn.style.borderColor = '#cbd5e1';
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.75';
+          });
+        } else {
+          badge.textContent = 'Корректируется';
+          badge.className = 'custom-sync-status-badge status-tech';
+          tildaMarks.forEach(m => { m.textContent = 'Корректируется'; m.style.backgroundColor = '#fefce8'; m.style.color = '#a16207'; });
+          btnElements.forEach(btn => {
+            btn.textContent = 'Корректируется';
+            btn.style.backgroundColor = '#fefce8';
+            btn.style.color = '#a16207';
+            btn.style.borderColor = '#fde047';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.85';
           });
         }
       } catch (err) {}

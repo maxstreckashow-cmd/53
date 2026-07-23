@@ -492,10 +492,142 @@ export default function App() {
   background-color: #f3f4f6;
   transform: scale(1.1);
 }
+
+/* Кнопки на странице каталога (residence-tula.ru/catalog) */
+.custom-catalog-two-btns {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.custom-catalog-btn {
+  flex: 1 !important;
+  text-align: center !important;
+  padding: 9px 12px !important;
+  font-family: Montserrat, Arial, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+.custom-catalog-btn.btn-open {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+  border: 1px solid #111827 !important;
+}
+.custom-catalog-btn.btn-open:hover {
+  background-color: #1f2937 !important;
+  border-color: #1f2937 !important;
+  color: #ffffff !important;
+}
+.custom-catalog-btn.btn-watch {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+  border: 1px solid #d1d5db !important;
+}
+.custom-catalog-btn.btn-watch:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+  color: #111827 !important;
+}
+
+/* Кнопка "Оставить заявку" на страницах объектов (residence-tula.ru/object) */
+.custom-object-request-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 320px !important;
+  padding: 14px 24px !important;
+  margin-top: 16px !important;
+  margin-bottom: 12px !important;
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-family: Montserrat, Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  border: none !important;
+}
+.custom-object-request-btn:hover {
+  background-color: #1d4ed8 !important;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
 </style>
 
 <script>
 (function() {
+  function applyCatalogAndObjectButtons() {
+    var loc = typeof window !== 'undefined' && window.location ? (window.location.href || '') : '';
+    var path = typeof window !== 'undefined' && window.location ? (window.location.pathname || '') : '';
+    var isCatalogPage = loc.indexOf('catalog') !== -1 || path.indexOf('catalog') !== -1;
+    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1;
+
+    // 1. Кнопки "Открыть" и "Смотреть" на странице каталога (residence-tula.ru/catalog)
+    if (isCatalogPage || document.querySelector('.t-store__card, .js-product, .js-store-prod')) {
+      var cards = document.querySelectorAll('.t-store__card, .js-product, .js-store-prod, .t-card');
+      cards.forEach(function(card) {
+        if (card.querySelector('.custom-catalog-two-btns')) return;
+
+        var linkEl = card.querySelector('a[href*="/object/"], a.js-product-link, a.t-store__card__imgwrapper, .t-store__card__title a, a');
+        var productHref = (linkEl && linkEl.getAttribute('href')) ? linkEl.getAttribute('href') : '#';
+
+        var btnsContainer = document.createElement('div');
+        btnsContainer.className = 'custom-catalog-two-btns';
+
+        btnsContainer.innerHTML = [
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">Открыть</a>',
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">Смотреть</a>'
+        ].join('');
+
+        var origBtn = card.querySelector('.t-store__card__btn, .js-store-prod-btn');
+        if (origBtn) {
+          origBtn.style.setProperty('display', 'none', 'important');
+        }
+
+        var targetWrapper = card.querySelector('.t-store__card__textwrapper, .t-store__card__info, .t-card__content') || card;
+        targetWrapper.appendChild(btnsContainer);
+      });
+    }
+
+    // 2. Кнопка "Оставить заявку" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
+    if (isObjectPage || document.querySelector('.t-store__product-snippet, .t-store__product-page, .js-product-snippet')) {
+      var objectContainers = Array.from(document.querySelectorAll('.t-store__product-snippet, .t-store__product-page, .t-store__product-full, .t-store__product-detail, .js-product-snippet, .t-store__prod-popup, .js-store-prod-popup'));
+      if (objectContainers.length === 0 && isObjectPage) {
+        var fallbackCont = document.querySelector('#allrecords, body');
+        if (fallbackCont) objectContainers = [fallbackCont];
+      }
+
+      objectContainers.forEach(function(container) {
+        if (container.querySelector('.custom-object-request-btn')) return;
+
+        var reqBtn = document.createElement('a');
+        reqBtn.href = '#popup:myformcatalog';
+        reqBtn.className = 'custom-object-request-btn';
+        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog');}");
+        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Оставить заявку';
+
+        var targetArea = container.querySelector('.t-store__product-snippet__btn-wrapper, .t-store__product-snippet__info, .t-store__prod-popup__info, .t-store__product-snippet__price, .js-store-prod-price') || container;
+        targetArea.appendChild(reqBtn);
+      });
+    }
+  }
   function hideTildaFilterElements() {
     var chosenBars = document.querySelectorAll('.t-store__filter__chosen-bar, .js-store-filter-chosen-bar, [class*="t-store__filter__chosen-bar"], [class*="chosen-bar"]');
     chosenBars.forEach(function(bar) {
@@ -855,18 +987,24 @@ export default function App() {
     document.addEventListener('DOMContentLoaded', function() {
       hideTildaFilterElements();
       initTildaCustomSliders();
+      applyCatalogAndObjectButtons();
     });
   } else {
     hideTildaFilterElements();
     initTildaCustomSliders();
+    applyCatalogAndObjectButtons();
   }
   
   var observer = new MutationObserver(function() {
     hideTildaFilterElements();
     initTildaCustomSliders();
+    applyCatalogAndObjectButtons();
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  setInterval(hideTildaFilterElements, 500);
+  setInterval(function() {
+    hideTildaFilterElements();
+    applyCatalogAndObjectButtons();
+  }, 500);
 })();
 </script>`;
 
@@ -917,6 +1055,83 @@ export default function App() {
   background-color: #fefce8 !important;
   color: #a16207 !important;
 }
+
+/* Кнопки на странице каталога (residence-tula.ru/catalog) */
+.custom-catalog-two-btns {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.custom-catalog-btn {
+  flex: 1 !important;
+  text-align: center !important;
+  padding: 9px 12px !important;
+  font-family: Montserrat, Arial, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+.custom-catalog-btn.btn-open {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+  border: 1px solid #111827 !important;
+}
+.custom-catalog-btn.btn-open:hover {
+  background-color: #1f2937 !important;
+  border-color: #1f2937 !important;
+  color: #ffffff !important;
+}
+.custom-catalog-btn.btn-watch {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+  border: 1px solid #d1d5db !important;
+}
+.custom-catalog-btn.btn-watch:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+  color: #111827 !important;
+}
+
+/* Кнопка "Оставить заявку" на страницах объектов (residence-tula.ru/object) */
+.custom-object-request-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 320px !important;
+  padding: 14px 24px !important;
+  margin-top: 16px !important;
+  margin-bottom: 12px !important;
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-family: Montserrat, Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  border: none !important;
+}
+.custom-object-request-btn:hover {
+  background-color: #1d4ed8 !important;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
 </style>
 <script>
 (function() {
@@ -948,9 +1163,66 @@ export default function App() {
     } catch(e) {}
   }
 
+  function applyCatalogAndObjectButtons() {
+    var loc = typeof window !== 'undefined' && window.location ? (window.location.href || '') : '';
+    var path = typeof window !== 'undefined' && window.location ? (window.location.pathname || '') : '';
+    var isCatalogPage = loc.indexOf('catalog') !== -1 || path.indexOf('catalog') !== -1;
+    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1;
+
+    // 1. Кнопки "Открыть" и "Смотреть" на странице каталога (residence-tula.ru/catalog)
+    if (isCatalogPage || document.querySelector('.t-store__card, .js-product, .js-store-prod')) {
+      var cards = document.querySelectorAll('.t-store__card, .js-product, .js-store-prod, .t-card');
+      cards.forEach(function(card) {
+        if (card.querySelector('.custom-catalog-two-btns')) return;
+
+        var linkEl = card.querySelector('a[href*="/object/"], a.js-product-link, a.t-store__card__imgwrapper, .t-store__card__title a, a');
+        var productHref = (linkEl && linkEl.getAttribute('href')) ? linkEl.getAttribute('href') : '#';
+
+        var btnsContainer = document.createElement('div');
+        btnsContainer.className = 'custom-catalog-two-btns';
+
+        btnsContainer.innerHTML = [
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">Открыть</a>',
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">Смотреть</a>'
+        ].join('');
+
+        var origBtn = card.querySelector('.t-store__card__btn, .js-store-prod-btn');
+        if (origBtn) {
+          origBtn.style.setProperty('display', 'none', 'important');
+        }
+
+        var targetWrapper = card.querySelector('.t-store__card__textwrapper, .t-store__card__info, .t-card__content') || card;
+        targetWrapper.appendChild(btnsContainer);
+      });
+    }
+
+    // 2. Кнопка "Оставить заявку" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
+    if (isObjectPage || document.querySelector('.t-store__product-snippet, .t-store__product-page, .js-product-snippet')) {
+      var objectContainers = Array.from(document.querySelectorAll('.t-store__product-snippet, .t-store__product-page, .t-store__product-full, .t-store__product-detail, .js-product-snippet, .t-store__prod-popup, .js-store-prod-popup'));
+      if (objectContainers.length === 0 && isObjectPage) {
+        var fallbackCont = document.querySelector('#allrecords, body');
+        if (fallbackCont) objectContainers = [fallbackCont];
+      }
+
+      objectContainers.forEach(function(container) {
+        if (container.querySelector('.custom-object-request-btn')) return;
+
+        var reqBtn = document.createElement('a');
+        reqBtn.href = '#popup:myformcatalog';
+        reqBtn.className = 'custom-object-request-btn';
+        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog');}");
+        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Оставить заявку';
+
+        var targetArea = container.querySelector('.t-store__product-snippet__btn-wrapper, .t-store__product-snippet__info, .t-store__prod-popup__info, .t-store__product-snippet__price, .js-store-prod-price') || container;
+        targetArea.appendChild(reqBtn);
+      });
+    }
+  }
+
   // Мгновенное синхронное обновление элементов DOM из памяти (<1мс)
   function applyDomoSyncToDOM() {
     hideTildaFilterElements();
+    applyCatalogAndObjectButtons();
     if (!window._domoFeedCache) return;
 
     const flatMap = window._domoFeedCache.flatMap;

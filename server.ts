@@ -476,7 +476,7 @@ app.get("/api/feed-info", async (req, res) => {
     if (f.type === 1) {
       return {
         ...f,
-        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+        images: [{ type: "plan", src: "https://static.tildacdn.com/tild3535-3538-4666-b863-323339393738/parking-lot-view-vec.avif" }]
       };
     }
     return f;
@@ -544,12 +544,13 @@ const feedConvertHandler = async (req: express.Request, res: express.Response) =
   const appProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
   const appUrl = `${appProto}://${appHost}`;
 
-  // Override images for all parking spaces to use the custom SVG icon
+  // Resolve category mapper
+  // Override images for all parking spaces to use requested parking image
   filteredFlats = filteredFlats.map(f => {
     if (f.type === 1) {
       return {
         ...f,
-        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+        images: [{ type: "plan", src: "https://static.tildacdn.com/tild3535-3538-4666-b863-323339393738/parking-lot-view-vec.avif" }]
       };
     }
     return f;
@@ -636,27 +637,35 @@ const feedConvertHandler = async (req: express.Request, res: express.Response) =
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=domoplaner_tilda_catalog.csv");
 
-    // Exact Tilda CSV columns as per user's provided example with added rooms count
-    const headerRow = "SKU;Category;Title;Description;Text;Photo;Price;Quantity;Price Old;Editions;Modifications;External ID;Parent UID;VAT;FFD1;FFD2;Characteristics: Кол-во комнат";
+    // Exact 30-column Tilda CSV layout matching user's provided structure
+    const headerRow = "Tilda UID;Brand;SKU;Mark;Category;Title;Description;Text;Photo;Price;Quantity;Price Old;Editions;Modifications;External ID;Parent UID;Characteristics:Проект;Characteristics:Секция;Characteristics:Этаж;Characteristics:Тип объекта;Characteristics:Площадь;Characteristics:Отделка;Characteristics:Номер на этаже;Characteristics:ID объекта;SEO title;SEO descr;SEO keywords;FB title;FB descr;Characteristics: Кол-во комнат";
     let csvContent = "\ufeff" + headerRow + "\n"; // Include UTF-8 BOM for Excel support
 
     filteredFlats.forEach(f => {
+      const tildaUid = String(300000000000 + Number(f.id));
+      const brand = "";
       const sku = String(f.id); // SKU = Id объекта
+      const mark = "";
       const category = getCategoryName(f);
       const title = getFlatName(f);
-      const description = getFlatDescription(f);
-      const text = getFlatText(f);
+      const description = "";
+      const text = "";
       const photo = f.images && f.images.length > 0 ? f.images.map(img => img.src).join(",") : "";
-      const price = f.price ? f.price.toFixed(4) : "";
+      const price = f.price ? String(f.price) : "";
       const quantity = f.status === 0 ? "1" : "0";
       const priceOld = "";
       const editions = "";
       const modifications = "";
       const extId = String(f.id);
       const parentUid = "";
-      const vat = "";
-      const ffd1 = "commodity";
-      const ffd2 = "full_payment";
+      const projectChar = f.projectTitle || "Резиденция";
+      const sectionChar = f.sectionTitle ? f.sectionTitle.replace(/^Секция\s+/i, "") : "";
+      const floorChar = f.floorNumber !== null && f.floorNumber !== undefined ? String(f.floorNumber) : "";
+      const typeChar = f.type === 0 ? "Квартира" : f.type === 1 ? "Машиноместо" : f.type === 3 ? "Коммерция" : "Другое";
+      const areaChar = f.area ? String(f.area) : "";
+      const decorationChar = f.decoration_name || "Без отделки";
+      const numberChar = f.number ? String(f.number) : "";
+      const idChar = String(f.id);
 
       let roomsCountValue = "";
       if (f.type === 0) {
@@ -675,24 +684,67 @@ const feedConvertHandler = async (req: express.Request, res: express.Response) =
         roomsCountValue = "";
       }
 
+      // Format SEO descr & keywords to match Tilda standard
+      let seoDescr = "";
+      let seoKeywords = "ЖК Резиденция, новостройка, ипотека, рассрочка, застройщик";
+
+      if (f.type === 0) {
+        let roomPrefix = "Квартира";
+        if (roomsCountValue === "Студия") roomPrefix = "Студия";
+        else if (roomsCountValue === "1") { roomPrefix = "Однокомнатная квартира"; seoKeywords = "ЖК Резиденция, новостройка, 1, комнатная, ипотека, рассрочка, застройщик"; }
+        else if (roomsCountValue === "2") { roomPrefix = "Двухкомнатная квартира"; seoKeywords = "ЖК Резиденция, новостройка, 2, комнатная, ипотека, рассрочка, застройщик"; }
+        else if (roomsCountValue === "3") { roomPrefix = "Трехкомнатная квартира"; seoKeywords = "ЖК Резиденция, новостройка, 3, комнатная, ипотека, рассрочка, застройщик"; }
+        else if (roomsCountValue === "4") { roomPrefix = "Четырехкомнатная квартира"; seoKeywords = "ЖК Резиденция, новостройка, 4, комнатная, ипотека, рассрочка, застройщик"; }
+        
+        if (roomPrefix === "Студия") {
+          seoDescr = `Студия №${f.number}, ${f.area} м². Жилой комплекс "Резиденция". Новостройка. Ипотека. Рассрочка. Наличные`;
+          seoKeywords = "ЖК Резиденция, новостройка, 1, комнатная, ипотека, рассрочка, застройщик";
+        } else {
+          seoDescr = `${roomPrefix} №${f.number}, ${f.area} м². Жилой комплекс "Резиденция". Новостройка. Ипотека. Рассрочка. Наличные`;
+        }
+      } else if (f.type === 1) {
+        seoDescr = `Машиноместо №${f.number}, ${f.area} м². Жилой комплекс "Резиденция". Новостройка. Ипотека. Рассрочка. Наличные`;
+      } else if (f.type === 3) {
+        seoDescr = `Коммерческое помещение №${f.number}, ${f.area} м². Жилой комплекс "Резиденция". Новостройка. Ипотека. Рассрочка. Наличные`;
+      } else {
+        seoDescr = `${title}. Жилой комплекс "Резиденция"`;
+      }
+
+      const seoTitle = title ? `${title}. Жилой комплекс "Резиденция"` : "";
+      const fbTitle = "";
+      const fbDescr = "";
+
       const row = [
-        sku,
-        category,
-        title,
-        description,
-        text,
-        photo,
-        price,
-        quantity,
-        priceOld,
-        editions,
-        modifications,
-        extId,
-        parentUid,
-        vat,
-        ffd1,
-        ffd2,
-        roomsCountValue
+        tildaUid,       // 1: Tilda UID
+        brand,          // 2: Brand
+        sku,            // 3: SKU
+        mark,           // 4: Mark
+        category,       // 5: Category
+        title,          // 6: Title
+        description,    // 7: Description
+        text,           // 8: Text
+        photo,          // 9: Photo
+        price,          // 10: Price
+        quantity,       // 11: Quantity
+        priceOld,       // 12: Price Old
+        editions,       // 13: Editions
+        modifications,  // 14: Modifications
+        extId,          // 15: External ID
+        parentUid,      // 16: Parent UID
+        projectChar,    // 17: Characteristics:Проект
+        sectionChar,    // 18: Characteristics:Секция
+        floorChar,      // 19: Characteristics:Этаж
+        typeChar,       // 20: Characteristics:Тип объекта
+        areaChar,       // 21: Characteristics:Площадь
+        decorationChar, // 22: Characteristics:Отделка
+        numberChar,     // 23: Characteristics:Номер на этаже
+        idChar,         // 24: Characteristics:ID объекта
+        seoTitle,       // 25: SEO title
+        seoDescr,       // 26: SEO descr
+        seoKeywords,    // 27: SEO keywords
+        fbTitle,        // 28: FB title
+        fbDescr,        // 29: FB descr
+        roomsCountValue // 30: Characteristics: Кол-во комнат
       ];
 
       csvContent += row.map(val => escapeCSV(val)).join(";") + "\n";
@@ -905,12 +957,12 @@ const feedJsonHandler = async (req: express.Request, res: express.Response) => {
   const appProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
   const appUrl = `${appProto}://${appHost}`;
 
-  // Override images for all parking spaces to use the custom SVG icon
+  // Override images for all parking spaces to use requested parking image
   filteredFlats = filteredFlats.map(f => {
     if (f.type === 1) {
       return {
         ...f,
-        images: [{ type: "plan", src: `${appUrl}/api/parking_space.svg` }]
+        images: [{ type: "plan", src: "https://static.tildacdn.com/tild3535-3538-4666-b863-323339393738/parking-lot-view-vec.avif" }]
       };
     }
     return f;

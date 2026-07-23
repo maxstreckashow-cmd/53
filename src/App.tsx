@@ -970,7 +970,7 @@ export default function App() {
         if (!sku) {
           const skuEl = el.querySelector('.js-store-prod-sku, .t-store__prod-popup__sku, .t-store__card__sku, .js-product-sku, [data-product-sku], input[name="sku"]');
           if (skuEl) {
-            sku = skuEl.getAttribute('data-product-sku') || skuEl.value || skuEl.textContent.replace(/Артикул:\s*/i, '').replace(/SKU:\s*/i, '').trim();
+            sku = skuEl.getAttribute('data-product-sku') || skuEl.value || skuEl.textContent.replace(/Артикул:\\s*/i, '').replace(/SKU:\\s*/i, '').trim();
           }
         }
 
@@ -1000,11 +1000,11 @@ export default function App() {
 
         if (!flat) {
           const txt = el.textContent || '';
-          const domoMatch = txt.match(/DOMO-(\d+)/i);
+          const domoMatch = txt.match(/DOMO-(\\d+)/i);
           if (domoMatch && flatMap[domoMatch[1]]) {
             flat = flatMap[domoMatch[1]];
           } else {
-            const flatNumMatch = txt.match(/№\s*(\d+[А-Яа-яA-Za-z]?)/i);
+            const flatNumMatch = txt.match(/№\\s*(\\d+[А-Яа-яA-Za-z]?)/i);
             if (flatNumMatch && flatByNumber[flatNumMatch[1]]) {
               flat = flatByNumber[flatNumMatch[1]];
             }
@@ -1111,7 +1111,7 @@ export default function App() {
     try {
       let baseUrl = BASE_API_URL;
       if (baseUrl && !baseUrl.endsWith('/feed.json') && !baseUrl.endsWith('/api/feed-json') && baseUrl.indexOf('?') === -1) {
-        baseUrl = baseUrl.replace(/\/$/, '') + '/feed.json';
+        baseUrl = (baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl) + '/feed.json';
       }
       
       const separator = baseUrl.indexOf('?') !== -1 ? '&' : '?';

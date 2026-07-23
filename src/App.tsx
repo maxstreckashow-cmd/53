@@ -913,6 +913,10 @@ export default function App() {
   background-color: #fef2f2 !important;
   color: #b91c1c !important;
 }
+.custom-sync-status-badge.status-tech {
+  background-color: #fefce8 !important;
+  color: #a16207 !important;
+}
 </style>
 <script>
 (function() {
@@ -1079,7 +1083,8 @@ export default function App() {
         const stStr = String(flat.status || '').toLowerCase();
         
         const isFree = stNum === 0 || stStr === '0' || stStr === 'free' || stStr === 'свободно';
-        const isBooked = stNum === 1 || stStr === '1' || stStr === 'booked' || stStr === ' забронировано' || stStr === 'reserved';
+        const isBooked = stNum === 1 || stStr === '1' || stStr === 'booked' || stStr.includes('забронирован') || stStr === 'бронь' || stStr === 'reserved';
+        const isTech = stNum === 2 || stStr === '2' || stStr === 'tech' || stStr === 'tech_booked' || stStr.includes('тех') || stStr.includes('коррект');
         
         const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn');
         
@@ -1105,7 +1110,7 @@ export default function App() {
             btn.style.display = '';
             btn.style.pointerEvents = 'auto';
             btn.style.opacity = '1';
-            if (btn.textContent.includes('Забронировано') || btn.textContent.includes('Продано')) {
+            if (btn.textContent.includes('Забронировано') || btn.textContent.includes('Продано') || btn.textContent.includes('Корректируется')) {
               btn.textContent = 'Выбрать';
               btn.style.backgroundColor = '';
               btn.style.color = '';
@@ -1120,6 +1125,17 @@ export default function App() {
             btn.style.backgroundColor = '#fff7ed';
             btn.style.color = '#c2410c';
             btn.style.borderColor = '#fdba74';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.85';
+          });
+        } else if (isTech) {
+          badge.textContent = 'Корректируется';
+          badge.className = 'custom-sync-status-badge status-tech';
+          btnElements.forEach(btn => {
+            btn.textContent = 'Корректируется';
+            btn.style.backgroundColor = '#fefce8';
+            btn.style.color = '#a16207';
+            btn.style.borderColor = '#fde047';
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.85';
           });
@@ -1716,8 +1732,8 @@ export default function App() {
                               {f.price ? f.price.toLocaleString('ru-RU') + ' ₽' : 'Не указана'}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-sm uppercase tracking-wide ${f.status === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : f.status === 1 ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
-                                {f.status === 0 ? 'Свободно' : f.status === 1 ? 'Забронировано' : 'Продано'}
+                              <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-sm uppercase tracking-wide ${f.status === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : f.status === 1 ? 'bg-orange-50 text-orange-700 border border-orange-100' : f.status === 2 ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+                                {f.status === 0 ? 'Свободно' : f.status === 1 ? 'Забронировано' : f.status === 2 ? 'Корректируется' : 'Продано'}
                               </span>
                             </td>
                           </tr>

@@ -504,11 +504,13 @@ export default function App() {
 .custom-catalog-btn {
   flex: 1 !important;
   text-align: center !important;
-  padding: 9px 12px !important;
+  padding: 10px 14px !important;
   font-family: Montserrat, Arial, sans-serif !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  border-radius: 6px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 0px !important;
   text-decoration: none !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -518,56 +520,57 @@ export default function App() {
   cursor: pointer !important;
 }
 .custom-catalog-btn.btn-open {
-  background-color: #111827 !important;
-  color: #ffffff !important;
-  border: 1px solid #111827 !important;
+  background-color: #2D221B !important;
+  color: #E7E0D6 !important;
+  border: 1px solid #2D221B !important;
+  border-radius: 0px !important;
 }
 .custom-catalog-btn.btn-open:hover {
-  background-color: #1f2937 !important;
-  border-color: #1f2937 !important;
-  color: #ffffff !important;
+  background-color: #3f3128 !important;
+  border-color: #3f3128 !important;
+  color: #E7E0D6 !important;
 }
 .custom-catalog-btn.btn-watch {
-  background-color: #f3f4f6 !important;
-  color: #1f2937 !important;
-  border: 1px solid #d1d5db !important;
+  background-color: #E7E0D6 !important;
+  color: #2D221B !important;
+  border: 1px solid #2D221B !important;
+  border-radius: 0px !important;
 }
 .custom-catalog-btn.btn-watch:hover {
-  background-color: #e5e7eb !important;
-  border-color: #9ca3af !important;
-  color: #111827 !important;
+  background-color: #dcd3c7 !important;
+  border-color: #2D221B !important;
+  color: #2D221B !important;
 }
 
-/* Кнопка "Оставить заявку" на страницах объектов (residence-tula.ru/object) */
+/* Кнопка "ОСТАВИТЬ ЗАЯВКУ" на страницах объектов (residence-tula.ru/object) */
 .custom-object-request-btn {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  max-width: 320px !important;
+  max-width: 340px !important;
   padding: 14px 24px !important;
   margin-top: 16px !important;
   margin-bottom: 12px !important;
-  background-color: #2563eb !important;
-  color: #ffffff !important;
+  background-color: #2D221B !important;
+  color: #E7E0D6 !important;
   font-family: Montserrat, Arial, sans-serif !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  border-radius: 8px !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 0px !important;
   text-decoration: none !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+  box-shadow: none !important;
   transition: all 0.2s ease !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
-  border: none !important;
+  border: 1px solid #2D221B !important;
 }
 .custom-object-request-btn:hover {
-  background-color: #1d4ed8 !important;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
-  color: #ffffff !important;
-  transform: translateY(-1px) !important;
+  background-color: #3f3128 !important;
+  border-color: #3f3128 !important;
+  color: #E7E0D6 !important;
 }
 </style>
 
@@ -576,11 +579,11 @@ export default function App() {
   function applyCatalogAndObjectButtons() {
     var loc = typeof window !== 'undefined' && window.location ? (window.location.href || '') : '';
     var path = typeof window !== 'undefined' && window.location ? (window.location.pathname || '') : '';
-    var isCatalogPage = loc.indexOf('catalog') !== -1 || path.indexOf('catalog') !== -1;
-    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1;
+    var isCatalogPage = loc.indexOf('/catalog') !== -1 || path.indexOf('/catalog') !== -1 || path === '/catalog' || document.querySelector('.t-store__filter') !== null;
+    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1 || document.querySelector('.t-store__product-snippet, .t-store__product-page, .t-store__prod-popup') !== null;
 
-    // 1. Кнопки "Открыть" и "Смотреть" на странице каталога (residence-tula.ru/catalog)
-    if (isCatalogPage || document.querySelector('.t-store__card, .js-product, .js-store-prod')) {
+    // 1. Кнопки "ОТКРЫТЬ" и "СМОТРЕТЬ" на странице каталога (residence-tula.ru/catalog)
+    if (isCatalogPage) {
       var cards = document.querySelectorAll('.t-store__card, .js-product, .js-store-prod, .t-card');
       cards.forEach(function(card) {
         if (card.querySelector('.custom-catalog-two-btns')) return;
@@ -592,8 +595,8 @@ export default function App() {
         btnsContainer.className = 'custom-catalog-two-btns';
 
         btnsContainer.innerHTML = [
-          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">Открыть</a>',
-          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">Смотреть</a>'
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">ОТКРЫТЬ</a>',
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">СМОТРЕТЬ</a>'
         ].join('');
 
         var origBtn = card.querySelector('.t-store__card__btn, .js-store-prod-btn');
@@ -606,10 +609,10 @@ export default function App() {
       });
     }
 
-    // 2. Кнопка "Оставить заявку" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
-    if (isObjectPage || document.querySelector('.t-store__product-snippet, .t-store__product-page, .js-product-snippet')) {
+    // 2. Кнопка "ОСТАВИТЬ ЗАЯВКУ" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
+    if (isObjectPage) {
       var objectContainers = Array.from(document.querySelectorAll('.t-store__product-snippet, .t-store__product-page, .t-store__product-full, .t-store__product-detail, .js-product-snippet, .t-store__prod-popup, .js-store-prod-popup'));
-      if (objectContainers.length === 0 && isObjectPage) {
+      if (objectContainers.length === 0) {
         var fallbackCont = document.querySelector('#allrecords, body');
         if (fallbackCont) objectContainers = [fallbackCont];
       }
@@ -620,8 +623,8 @@ export default function App() {
         var reqBtn = document.createElement('a');
         reqBtn.href = '#popup:myformcatalog';
         reqBtn.className = 'custom-object-request-btn';
-        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog');}");
-        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Оставить заявку';
+        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog'); return false;}");
+        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>ОСТАВИТЬ ЗАЯВКУ';
 
         var targetArea = container.querySelector('.t-store__product-snippet__btn-wrapper, .t-store__product-snippet__info, .t-store__prod-popup__info, .t-store__product-snippet__price, .js-store-prod-price') || container;
         targetArea.appendChild(reqBtn);
@@ -1067,11 +1070,13 @@ export default function App() {
 .custom-catalog-btn {
   flex: 1 !important;
   text-align: center !important;
-  padding: 9px 12px !important;
+  padding: 10px 14px !important;
   font-family: Montserrat, Arial, sans-serif !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  border-radius: 6px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 0px !important;
   text-decoration: none !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -1081,56 +1086,57 @@ export default function App() {
   cursor: pointer !important;
 }
 .custom-catalog-btn.btn-open {
-  background-color: #111827 !important;
-  color: #ffffff !important;
-  border: 1px solid #111827 !important;
+  background-color: #2D221B !important;
+  color: #E7E0D6 !important;
+  border: 1px solid #2D221B !important;
+  border-radius: 0px !important;
 }
 .custom-catalog-btn.btn-open:hover {
-  background-color: #1f2937 !important;
-  border-color: #1f2937 !important;
-  color: #ffffff !important;
+  background-color: #3f3128 !important;
+  border-color: #3f3128 !important;
+  color: #E7E0D6 !important;
 }
 .custom-catalog-btn.btn-watch {
-  background-color: #f3f4f6 !important;
-  color: #1f2937 !important;
-  border: 1px solid #d1d5db !important;
+  background-color: #E7E0D6 !important;
+  color: #2D221B !important;
+  border: 1px solid #2D221B !important;
+  border-radius: 0px !important;
 }
 .custom-catalog-btn.btn-watch:hover {
-  background-color: #e5e7eb !important;
-  border-color: #9ca3af !important;
-  color: #111827 !important;
+  background-color: #dcd3c7 !important;
+  border-color: #2D221B !important;
+  color: #2D221B !important;
 }
 
-/* Кнопка "Оставить заявку" на страницах объектов (residence-tula.ru/object) */
+/* Кнопка "ОСТАВИТЬ ЗАЯВКУ" на страницах объектов (residence-tula.ru/object) */
 .custom-object-request-btn {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  max-width: 320px !important;
+  max-width: 340px !important;
   padding: 14px 24px !important;
   margin-top: 16px !important;
   margin-bottom: 12px !important;
-  background-color: #2563eb !important;
-  color: #ffffff !important;
+  background-color: #2D221B !important;
+  color: #E7E0D6 !important;
   font-family: Montserrat, Arial, sans-serif !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  border-radius: 8px !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 0px !important;
   text-decoration: none !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+  box-shadow: none !important;
   transition: all 0.2s ease !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
-  border: none !important;
+  border: 1px solid #2D221B !important;
 }
 .custom-object-request-btn:hover {
-  background-color: #1d4ed8 !important;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
-  color: #ffffff !important;
-  transform: translateY(-1px) !important;
+  background-color: #3f3128 !important;
+  border-color: #3f3128 !important;
+  color: #E7E0D6 !important;
 }
 </style>
 <script>
@@ -1166,11 +1172,11 @@ export default function App() {
   function applyCatalogAndObjectButtons() {
     var loc = typeof window !== 'undefined' && window.location ? (window.location.href || '') : '';
     var path = typeof window !== 'undefined' && window.location ? (window.location.pathname || '') : '';
-    var isCatalogPage = loc.indexOf('catalog') !== -1 || path.indexOf('catalog') !== -1;
-    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1;
+    var isCatalogPage = loc.indexOf('/catalog') !== -1 || path.indexOf('/catalog') !== -1 || path === '/catalog' || document.querySelector('.t-store__filter') !== null;
+    var isObjectPage = loc.indexOf('/object') !== -1 || path.indexOf('/object') !== -1 || document.querySelector('.t-store__product-snippet, .t-store__product-page, .t-store__prod-popup') !== null;
 
-    // 1. Кнопки "Открыть" и "Смотреть" на странице каталога (residence-tula.ru/catalog)
-    if (isCatalogPage || document.querySelector('.t-store__card, .js-product, .js-store-prod')) {
+    // 1. Кнопки "ОТКРЫТЬ" и "СМОТРЕТЬ" на странице каталога (residence-tula.ru/catalog)
+    if (isCatalogPage) {
       var cards = document.querySelectorAll('.t-store__card, .js-product, .js-store-prod, .t-card');
       cards.forEach(function(card) {
         if (card.querySelector('.custom-catalog-two-btns')) return;
@@ -1182,8 +1188,8 @@ export default function App() {
         btnsContainer.className = 'custom-catalog-two-btns';
 
         btnsContainer.innerHTML = [
-          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">Открыть</a>',
-          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">Смотреть</a>'
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-open">ОТКРЫТЬ</a>',
+          '<a href="' + productHref + '" class="custom-catalog-btn btn-watch">СМОТРЕТЬ</a>'
         ].join('');
 
         var origBtn = card.querySelector('.t-store__card__btn, .js-store-prod-btn');
@@ -1196,10 +1202,10 @@ export default function App() {
       });
     }
 
-    // 2. Кнопка "Оставить заявку" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
-    if (isObjectPage || document.querySelector('.t-store__product-snippet, .t-store__product-page, .js-product-snippet')) {
+    // 2. Кнопка "ОСТАВИТЬ ЗАЯВКУ" (#popup:myformcatalog) на страницах объектов (residence-tula.ru/object)
+    if (isObjectPage) {
       var objectContainers = Array.from(document.querySelectorAll('.t-store__product-snippet, .t-store__product-page, .t-store__product-full, .t-store__product-detail, .js-product-snippet, .t-store__prod-popup, .js-store-prod-popup'));
-      if (objectContainers.length === 0 && isObjectPage) {
+      if (objectContainers.length === 0) {
         var fallbackCont = document.querySelector('#allrecords, body');
         if (fallbackCont) objectContainers = [fallbackCont];
       }
@@ -1210,8 +1216,8 @@ export default function App() {
         var reqBtn = document.createElement('a');
         reqBtn.href = '#popup:myformcatalog';
         reqBtn.className = 'custom-object-request-btn';
-        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog');}");
-        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Оставить заявку';
+        reqBtn.setAttribute('onclick', "if(window.t_popup__show){window.t_popup__show('myformcatalog'); return false;}");
+        reqBtn.innerHTML = '<svg style="width:18px; height:18px; margin-right:8px; fill:none; stroke:currentColor; stroke-width:2;" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>ОСТАВИТЬ ЗАЯВКУ';
 
         var targetArea = container.querySelector('.t-store__product-snippet__btn-wrapper, .t-store__product-snippet__info, .t-store__prod-popup__info, .t-store__product-snippet__price, .js-store-prod-price') || container;
         targetArea.appendChild(reqBtn);
@@ -1333,8 +1339,10 @@ export default function App() {
           }
         }
 
+        if (!flat) return;
+
         // 1. Обновляем цену, если объект найден
-        if (flat && flat.price && Number(flat.price) > 0) {
+        if (flat.price && Number(flat.price) > 0) {
           const rawPrice = Number(flat.price);
           const formattedPrice = rawPrice.toLocaleString('ru-RU') + ' ₽';
           
@@ -1382,7 +1390,7 @@ export default function App() {
         // 2. Классифицируем статус объекта (Свободно / Забронировано / Продано / Корректируется если статус не удалось определить)
         let statusCategory = 'tech'; // по умолчанию "Корректируется" если статус не удалось определить
 
-        if (flat && flat.status !== undefined && flat.status !== null) {
+        if (flat.status !== undefined && flat.status !== null) {
           const stNum = Number(flat.status);
           const stStr = String(flat.status || '').toLowerCase().trim();
 
@@ -1395,13 +1403,12 @@ export default function App() {
           } else if (stNum === 2 || stStr === '2' || stStr === 'tech' || stStr.includes('тех') || stStr.includes('коррект')) {
             statusCategory = 'tech';
           } else {
-            statusCategory = 'tech'; // в случае нераспознанного статуса -> "Корректируется"
+            statusCategory = 'tech';
           }
-        } else {
-          statusCategory = 'tech'; // в случае если статус не удалось определить -> "Корректируется"
         }
         
         const btnElements = el.querySelectorAll('.js-store-prod-btn, .t-store__card__btn, .t-btn, .t-store__prod-popup__btn, .t-store__product-snippet__btn, .js-store-btn, .t-store__prod-popup__buy-btn, .js-store-prod-popup-buy-btn');
+        const catalogBtns = el.querySelectorAll('.custom-catalog-btn');
         const tildaMarks = el.querySelectorAll('.t-store__card__mark, .js-store-prod-mark, .t-store__prod-popup__mark, .t-store__product-snippet__mark, .js-product-mark');
 
         let badge = el.querySelector('.custom-sync-status-badge');
@@ -1446,6 +1453,14 @@ export default function App() {
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.85';
           });
+          catalogBtns.forEach(btn => {
+            if (btn.classList.contains('btn-open')) {
+              btn.textContent = 'Забронировано';
+              btn.style.backgroundColor = '#fff7ed';
+              btn.style.color = '#c2410c';
+              btn.style.borderColor = '#fdba74';
+            }
+          });
         } else if (statusCategory === 'sold') {
           badge.textContent = 'Продано';
           badge.className = 'custom-sync-status-badge status-sold';
@@ -1458,6 +1473,14 @@ export default function App() {
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.75';
           });
+          catalogBtns.forEach(btn => {
+            if (btn.classList.contains('btn-open')) {
+              btn.textContent = 'Продано';
+              btn.style.backgroundColor = '#e2e8f0';
+              btn.style.color = '#64748b';
+              btn.style.borderColor = '#cbd5e1';
+            }
+          });
         } else {
           badge.textContent = 'Корректируется';
           badge.className = 'custom-sync-status-badge status-tech';
@@ -1469,6 +1492,14 @@ export default function App() {
             btn.style.borderColor = '#fde047';
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.85';
+          });
+          catalogBtns.forEach(btn => {
+            if (btn.classList.contains('btn-open')) {
+              btn.textContent = 'Корректируется';
+              btn.style.backgroundColor = '#fefce8';
+              btn.style.color = '#a16207';
+              btn.style.borderColor = '#fde047';
+            }
           });
         }
       } catch (err) {}
